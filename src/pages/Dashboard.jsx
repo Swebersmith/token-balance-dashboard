@@ -4,6 +4,7 @@ import Layout from '../components/Layout'
 import BalanceOverview from '../components/BalanceOverview'
 import ProviderGrid from '../components/ProviderGrid'
 import PaymentPanel from '../components/PaymentPanel'
+import PricingPanel from '../components/PricingPanel'
 import { Info } from 'lucide-react'
 
 export function Dashboard() {
@@ -46,6 +47,10 @@ export function Dashboard() {
 
       <section>
         <PaymentPanel />
+      </section>
+
+      <section>
+        <PricingPanel />
       </section>
     </Layout>
   )
