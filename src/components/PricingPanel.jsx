@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronUp, ExternalLink, DollarSign } from 'lucide-react'
-import { PROVIDERS } from '../utils/providers'
+import { useAdmin } from '../context/AdminContext'
 
 export default function PricingPanel() {
+  const { providers } = useAdmin()
   const [expanded, setExpanded] = useState({})
 
   const toggle = (id) => setExpanded(prev => ({ ...prev, [id]: !prev[id] }))
@@ -15,7 +16,7 @@ export default function PricingPanel() {
       </div>
 
       <div className="space-y-2">
-        {Object.values(PROVIDERS).map((p) => (
+        {Object.values(providers).map((p) => (
           <div key={p.id} className="border border-gray-100 dark:border-gray-700 rounded-lg overflow-hidden">
             <button
               onClick={() => toggle(p.id)}
