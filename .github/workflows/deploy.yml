@@ -10,17 +10,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
+
       - run: npm ci
       - run: npm run build
-      - name: Publish to Cloudflare Pages
-        uses: cloudflare/pages-action@v1
+
+      - uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: 983cc443d4495cca90ddf4f95ff6493f
-          projectName: token-balance-dashboard
-          directory: dist
-          branch: main
+          command: pages deploy dist --project-name=token-balance-dashboard --branch=main
