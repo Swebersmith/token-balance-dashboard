@@ -1,0 +1,17 @@
+# AI Provider API Keys
+OPENAI_API_KEY=sk-xxx
+OPENAI_ORG_ID=org-xxx
+ANTHROPIC_API_KEY=sk-ant-xxx
+DEEPSEEK_API_KEY=sk-xxx
+GOOGLE_AI_API_KEY=xxx
+GROQ_API_KEY=gsk_xxx
+OPENROUTER_API_KEY=sk-or-xxx
+TOGETHER_API_KEY=xxx
+
+# Stripe
+STRIPE_SECRET_KEY=sk_test_xxx
+STRIPE_WEBHOOK_SECRET=whsec_xxx
+PUBLIC_STRIPE_KEY=pk_test_xxx
+
+# Site
+SITE_URL=http://localhost:5173

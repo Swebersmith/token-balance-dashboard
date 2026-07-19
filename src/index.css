@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+@theme {
+  --color-openai: #10a37f;
+  --color-anthropic: #d97706;
+  --color-deepseek: #4f46e5;
+  --color-google: #4285f4;
+  --color-groq: #f97316;
+  --color-openrouter: #6366f1;
+  --color-together: #0891b2;
+}
