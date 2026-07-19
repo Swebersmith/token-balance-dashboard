@@ -1,9 +1,11 @@
-import { RefreshCw, Wallet, Settings } from 'lucide-react'
+import { RefreshCw, Wallet, Settings, Sun, Moon } from 'lucide-react'
 import { useBalance } from '../context/BalanceContext'
+import { useTheme } from '../context/ThemeContext'
 import { formatTime } from '../utils/formatters'
 
 export default function Header() {
   const { refresh, loading, lastUpdated } = useBalance()
+  const { theme, toggle } = useTheme()
 
   return (
     <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 sm:px-6">
@@ -19,7 +21,14 @@ export default function Header() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={toggle}
+            className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors cursor-pointer"
+            title={theme === 'dark' ? '切换亮色模式' : '切换暗色模式'}
+          >
+            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
           <a
             href="/admin"
             className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"

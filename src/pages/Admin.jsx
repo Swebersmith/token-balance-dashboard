@@ -1,10 +1,9 @@
 import { useState } from 'react'
-import { ArrowLeft, Plus, Trash2, Save, Settings, DollarSign, Link, Database } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Save, Settings, DollarSign, Link, Database, RotateCcw, AlertTriangle } from 'lucide-react'
 import { useAdmin } from '../context/AdminContext'
-import { PROVIDERS } from '../utils/providers'
 import Layout from '../components/Layout'
 
-function ProviderEditor({ provider, isCustom, onSave, onDelete }) {
+function ProviderEditor({ provider, onSave, onDelete }) {
   const [edit, setEdit] = useState({ ...provider })
 
   return (
@@ -15,7 +14,7 @@ function ProviderEditor({ provider, isCustom, onSave, onDelete }) {
           <input
             value={edit.id}
             onChange={e => setEdit(p => ({ ...p, id: e.target.value }))}
-            disabled={!isCustom}
+            disabled
             className="w-full px-3 py-1.5 text-sm border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white disabled:opacity-50"
           />
         </div>
@@ -165,27 +164,22 @@ function ProviderEditor({ provider, isCustom, onSave, onDelete }) {
         >
           <Save className="w-3 h-3" /> 保存
         </button>
-        {isCustom && (
-          <button
-            onClick={() => onDelete(edit.id)}
-            className="flex items-center gap-1 px-4 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 cursor-pointer"
-          >
-            <Trash2 className="w-3 h-3" /> 删除
-          </button>
-        )}
+        <button
+          onClick={() => { if (confirm(`确定删除 ${edit.name}？`)) onDelete(edit.id) }}
+          className="flex items-center gap-1 px-4 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 cursor-pointer"
+        >
+          <Trash2 className="w-3 h-3" /> 删除
+        </button>
       </div>
     </div>
   )
 }
 
 export function Admin() {
-  const { providers, customProviders, addProvider, removeProvider, updateProvider } = useAdmin()
+  const { providers, removedBuiltins, addProvider, removeProvider, updateProvider, restoreBuiltins } = useAdmin()
   const [tab, setTab] = useState('providers')
   const [newId, setNewId] = useState('')
   const [editingId, setEditingId] = useState(null)
-
-  const allProviders = { ...PROVIDERS }
-  customProviders.forEach(p => { allProviders[p.id] = p })
 
   const handleAdd = () => {
     if (!newId.trim()) return
@@ -257,30 +251,52 @@ export function Admin() {
             </button>
           </div>
 
+          {removedBuiltins.length > 0 && (
+            <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3">
+              <AlertTriangle className="w-4 h-4 text-amber-600" />
+              <span className="text-sm text-amber-700 dark:text-amber-400">
+                已删除 {removedBuiltins.length} 个内置服务商
+              </span>
+              <button
+                onClick={restoreBuiltins}
+                className="ml-auto flex items-center gap-1 px-3 py-1 text-sm bg-amber-600 text-white rounded-lg hover:bg-amber-700 cursor-pointer"
+              >
+                <RotateCcw className="w-3 h-3" /> 恢复全部
+              </button>
+            </div>
+          )}
+
           <div className="space-y-3">
-            {Object.values(allProviders).map((p) => (
+            {Object.values(providers).map((p) => (
               <div key={p.id}>
-                <div
-                  onClick={() => setEditingId(editingId === p.id ? null : p.id)}
-                  className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border cursor-pointer hover:border-indigo-300"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold" style={{ backgroundColor: p.color }}>
+                <div className="flex items-center p-3 bg-white dark:bg-gray-800 rounded-lg border">
+                  <div
+                    onClick={() => setEditingId(editingId === p.id ? null : p.id)}
+                    className="flex items-center gap-3 flex-1 cursor-pointer min-w-0"
+                  >
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold shrink-0" style={{ backgroundColor: p.color }}>
                       {p.name[0]}
                     </div>
-                    <div>
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">{p.name}</span>
+                    <div className="min-w-0">
+                      <span className="text-sm font-medium text-gray-900 dark:text-white truncate">{p.name}</span>
                       <span className="text-xs text-gray-400 ml-2">{p.nameZh}</span>
-                      {PROVIDERS[p.id] && <span className="text-xs text-gray-400 ml-1">(内置)</span>}
                     </div>
                   </div>
-                  <span className="text-xs text-gray-400">{editingId === p.id ? '收起' : '编辑'}</span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-xs text-gray-400">{editingId === p.id ? '收起' : '编辑'}</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); if (confirm(`确定删除 ${p.name}？`)) removeProvider(p.id) }}
+                      className="p-1 text-red-400 hover:text-red-600 cursor-pointer"
+                      title="删除"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
                 {editingId === p.id && (
                   <div className="mt-2">
                     <ProviderEditor
                       provider={p}
-                      isCustom={!PROVIDERS[p.id]}
                       onSave={(updated) => { updateProvider(p.id, updated); setEditingId(null) }}
                       onDelete={(id) => { removeProvider(id); setEditingId(null) }}
                     />
@@ -296,7 +312,7 @@ export function Admin() {
       {tab === 'pricing' && (
         <div className="space-y-4">
           <p className="text-sm text-gray-500 dark:text-gray-400">编辑各服务商的模型价格表，点击展开编辑</p>
-          {Object.values(allProviders).map((p) => (
+          {Object.values(providers).map((p) => (
             <div key={p.id} className="bg-white dark:bg-gray-800 rounded-lg border p-4">
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-7 h-7 rounded flex items-center justify-center text-white text-xs font-bold" style={{ backgroundColor: p.color }}>{p.name[0]}</div>
@@ -332,7 +348,7 @@ export function Admin() {
       {tab === 'recharge' && (
         <div className="space-y-4">
           <p className="text-sm text-gray-500 dark:text-gray-400">编辑各服务商的充值和价格页面链接</p>
-          {Object.values(allProviders).map((p) => (
+          {Object.values(providers).map((p) => (
             <div key={p.id} className="bg-white dark:bg-gray-800 rounded-lg border p-4">
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-7 h-7 rounded flex items-center justify-center text-white text-xs font-bold" style={{ backgroundColor: p.color }}>{p.name[0]}</div>

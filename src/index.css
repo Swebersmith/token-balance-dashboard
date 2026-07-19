@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Class-based dark mode: supports both auto (system) and manual toggle */
+@variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-openai: #10a37f;
   --color-anthropic: #d97706;

@@ -3,26 +3,22 @@ import { PROVIDERS } from '../utils/providers'
 
 const AdminContext = createContext(null)
 
-const DEFAULT_ADMIN = {
-  providers: { ...PROVIDERS },
-  customProviders: [],
-}
-
 function loadAdmin() {
   try {
     const saved = localStorage.getItem('token_dashboard_admin')
     if (saved) {
       const data = JSON.parse(saved)
-      return {
-        providers: { ...PROVIDERS, ...data.customProviders?.reduce((acc, p) => {
-          acc[p.id] = p
-          return acc
-        }, {}) },
-        customProviders: data.customProviders || [],
-      }
+      const removedBuiltins = data.removedBuiltins || []
+      const customProviders = data.customProviders || []
+      const providers = { ...PROVIDERS }
+      // Apply custom providers (add/override)
+      customProviders.forEach(p => { providers[p.id] = p })
+      // Remove hidden builtins
+      removedBuiltins.forEach(id => { delete providers[id] })
+      return { providers, customProviders, removedBuiltins }
     }
   } catch { /* ignore */ }
-  return { providers: { ...PROVIDERS }, customProviders: [] }
+  return { providers: { ...PROVIDERS }, customProviders: [], removedBuiltins: [] }
 }
 
 export function AdminProvider({ children }) {
@@ -31,35 +27,44 @@ export function AdminProvider({ children }) {
   useEffect(() => {
     localStorage.setItem('token_dashboard_admin', JSON.stringify({
       customProviders: admin.customProviders,
+      removedBuiltins: admin.removedBuiltins,
     }))
-  }, [admin.customProviders])
-
-  const allProviders = useCallback(() => {
-    const merged = { ...PROVIDERS }
-    admin.customProviders.forEach(p => { merged[p.id] = p })
-    return merged
-  }, [admin.customProviders])
+  }, [admin.customProviders, admin.removedBuiltins])
 
   const addProvider = useCallback((provider) => {
     setAdmin(prev => ({
       ...prev,
       customProviders: [...prev.customProviders.filter(p => p.id !== provider.id), provider],
       providers: { ...prev.providers, [provider.id]: provider },
+      removedBuiltins: prev.removedBuiltins.filter(id => id !== provider.id),
     }))
   }, [])
 
   const removeProvider = useCallback((id) => {
-    if (PROVIDERS[id]) return // Can't remove built-in
+    setAdmin(prev => {
+      const isBuiltin = !!PROVIDERS[id]
+      return {
+        ...prev,
+        customProviders: prev.customProviders.filter(p => p.id !== id),
+        providers: Object.fromEntries(Object.entries(prev.providers).filter(([k]) => k !== id)),
+        removedBuiltins: isBuiltin
+          ? [...new Set([...prev.removedBuiltins, id])]
+          : prev.removedBuiltins,
+      }
+    })
+  }, [])
+
+  const restoreBuiltins = useCallback(() => {
     setAdmin(prev => ({
       ...prev,
-      customProviders: prev.customProviders.filter(p => p.id !== id),
-      providers: Object.fromEntries(Object.entries(prev.providers).filter(([k]) => k !== id)),
+      providers: { ...PROVIDERS, ...Object.fromEntries(prev.customProviders.map(p => [p.id, p])) },
+      removedBuiltins: [],
     }))
   }, [])
 
   const updateProvider = useCallback((id, updates) => {
     setAdmin(prev => {
-      const prov = { ...(prev.providers[id] || {}), ...updates }
+      const prov = { ...(PROVIDERS[id] || {}), ...(prev.providers[id] || {}), ...updates }
       return {
         ...prev,
         providers: { ...prev.providers, [id]: prov },
@@ -71,7 +76,9 @@ export function AdminProvider({ children }) {
   }, [])
 
   return (
-    <AdminContext.Provider value={{ ...admin, allProviders, addProvider, removeProvider, updateProvider }}>
+    <AdminContext.Provider value={{
+      ...admin, addProvider, removeProvider, restoreBuiltins, updateProvider,
+    }}>
       {children}
     </AdminContext.Provider>
   )
