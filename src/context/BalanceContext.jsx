@@ -4,13 +4,13 @@ import { fetchBalances, fetchProviderBalance } from '../utils/api'
 const BalanceContext = createContext(null)
 
 const DEMO_BALANCES = [
-  { provider: 'openai', balance: 23.50, currency: 'USD', status: 'ok' },
+  { provider: 'openai', balance: 3.50, currency: 'USD', status: 'ok' },
   { provider: 'anthropic', balance: 150.00, currency: 'USD', status: 'ok' },
-  { provider: 'deepseek', balance: 86.42, currency: 'CNY', status: 'ok' },
+  { provider: 'deepseek', balance: 15.42, currency: 'CNY', status: 'ok' },
   { provider: 'google', balance: null, currency: 'USD', status: 'configured', note: '请前往 GCP 控制台查看余额' },
   { provider: 'groq', balance: null, currency: 'USD', status: 'configured', note: '请前往 Groq Console 查看余额' },
-  { provider: 'openrouter', balance: 5.78, currency: 'USD', status: 'ok' },
-  { provider: 'together', balance: 12.30, currency: 'USD', status: 'ok' },
+  { provider: 'openrouter', balance: 8.90, currency: 'USD', status: 'ok' },
+  { provider: 'together', balance: 45.00, currency: 'USD', status: 'ok' },
 ]
 
 const initialState = {

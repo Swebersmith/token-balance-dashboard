@@ -1,7 +1,15 @@
-import { ExternalLink, RefreshCw, AlertCircle, CheckCircle, HelpCircle } from 'lucide-react'
+import { ExternalLink, RefreshCw, AlertCircle, CheckCircle, HelpCircle, TrendingDown } from 'lucide-react'
 import { useBalance } from '../context/BalanceContext'
 import { getProvider } from '../utils/providers'
 import { formatCurrency } from '../utils/formatters'
+
+function getBalanceLevel(balance, currency) {
+  if (balance == null) return null
+  const usdEq = currency === 'CNY' ? balance / 7.2 : balance
+  if (usdEq < 5) return { level: 'low', color: 'text-red-600', barColor: 'bg-red-500', label: '余额不足' }
+  if (usdEq < 20) return { level: 'warn', color: 'text-amber-600', barColor: 'bg-amber-500', label: '余额偏低' }
+  return { level: 'good', color: 'text-emerald-600', barColor: 'bg-emerald-500', label: '充足' }
+}
 
 export default function ProviderCard({ data }) {
   const { refreshProvider, loading } = useBalance()
@@ -22,26 +30,25 @@ export default function ProviderCard({ data }) {
     unconfigured: '未配置',
   }
 
+  const balanceLevel = getBalanceLevel(data.balance, data.currency || provider.currency)
+
   return (
-    <div
-      className="relative bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow"
-      style={{ borderTopColor: data.status === 'ok' ? provider.color : undefined, borderTopWidth: data.status === 'ok' ? '3px' : undefined }}
-    >
+    <div className="relative bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md transition-shadow">
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold shrink-0"
             style={{ backgroundColor: provider.color }}
           >
             {provider.name[0]}
           </div>
-          <div>
-            <h3 className="font-semibold text-sm text-gray-900 dark:text-white">{provider.name}</h3>
+          <div className="min-w-0">
+            <h3 className="font-semibold text-sm text-gray-900 dark:text-white truncate">{provider.name}</h3>
             <p className="text-xs text-gray-500 dark:text-gray-400">{provider.nameZh}</p>
           </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 shrink-0">
           {statusIcon[data.status] || statusIcon.unconfigured}
           <span className="text-xs text-gray-500 dark:text-gray-400">{statusText[data.status] || data.status}</span>
         </div>
@@ -51,10 +58,29 @@ export default function ProviderCard({ data }) {
       <div className="mb-3">
         {data.status === 'ok' && data.balance != null ? (
           <>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">
-              {formatCurrency(data.balance, data.currency || provider.currency)}
+            <div className="flex items-baseline gap-1">
+              <div className={`text-2xl font-bold ${balanceLevel?.color || 'text-gray-900 dark:text-white'}`}>
+                {formatCurrency(data.balance, data.currency || provider.currency)}
+              </div>
+              {balanceLevel?.level === 'low' && (
+                <TrendingDown className="w-4 h-4 text-red-500" />
+              )}
             </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">可用余额</div>
+
+            {/* Balance bar */}
+            <div className="mt-2 w-full h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${balanceLevel?.barColor || 'bg-emerald-500'}`}
+                style={{ width: `${Math.min(balanceLevel?.level === 'low' ? 8 : balanceLevel?.level === 'warn' ? 25 : 70, 100)}%` }}
+              />
+            </div>
+
+            <div className="flex items-center justify-between mt-1">
+              <span className={`text-xs ${balanceLevel?.color || ''}`}>
+                {balanceLevel?.label}
+              </span>
+              <span className="text-xs text-gray-400 dark:text-gray-500">可用余额</span>
+            </div>
           </>
         ) : data.status === 'error' ? (
           <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg p-2">
@@ -65,11 +91,9 @@ export default function ProviderCard({ data }) {
             {data.note || '请前往官网查看余额'}
           </div>
         ) : (
-          <div className="text-sm text-gray-500">--</div>
+          <div className="text-sm text-gray-500 py-2">--</div>
         )}
       </div>
-
-      {/* Loading skeleton state handled by parent already */}
 
       {/* Actions */}
       <div className="flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-gray-700">
