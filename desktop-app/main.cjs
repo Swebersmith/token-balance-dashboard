@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, safeStorage, shell } = require('electron')
+const { app, BrowserWindow, ipcMain, safeStorage, session, shell } = require('electron')
 const fs = require('fs/promises')
 const path = require('path')
 
@@ -63,6 +63,10 @@ function amount(value) {
   return Number.isFinite(parsed) ? parsed : null
 }
 
+function webPreferencesFor(provider) {
+  return { session: session.fromPartition(`persist:token-balance-${provider.id}`), contextIsolation: true, nodeIntegration: false }
+}
+
 async function fetchJson(url, options, provider) {
   const response = await fetch(url, options)
   if (!response.ok) throw new Error(`${provider} request failed (${response.status})`)
@@ -103,9 +107,14 @@ async function fetchDirect(provider, apiKey) {
 
 function extractPageData() {
   const text = document.body.innerText || ''
-  const balanceMatch = text.match(/(?:账户)?余额\s*[:：]?\s*([￥¥$])?\s*([\d,]+(?:\.\d+)?)/i)
+  const balanceMatch = [
+    /(?:\u8d26\u6237)?\u4f59\u989d\s*[:\uff1a]?\s*([\u00a5\uffe5$])?\s*([\d,]+(?:\.\d+)?)/i,
+    /(?:account\s*)?balance\s*[:\uff1a]?\s*([\u00a5\uffe5$])?\s*([\d,]+(?:\.\d+)?)/i,
+    /(?:available\s*)?credits?\s*[:\uff1a]?\s*([\u00a5\uffe5$])?\s*([\d,]+(?:\.\d+)?)/i,
+    /remaining\s*(?:balance|credits?)\s*[:\uff1a]?\s*([\u00a5\uffe5$])?\s*([\d,]+(?:\.\d+)?)/i,
+  ].map((pattern) => text.match(pattern)).find(Boolean)
   const balance = balanceMatch ? Number(balanceMatch[2].replaceAll(',', '')) : null
-  const currency = balanceMatch?.[1] === '￥' || balanceMatch?.[1] === '¥' ? 'CNY' : 'USD'
+  const currency = balanceMatch?.[1] === '\u00a5' || balanceMatch?.[1] === '\uffe5' ? 'CNY' : 'USD'
   const models = Array.from(document.querySelectorAll('table tr')).slice(1, 21).map((row) => {
     const values = row.innerText.split('\n').map((value) => value.trim()).filter(Boolean)
     return values.length >= 2 ? { name: values[0], price: values.slice(1).join(' ') } : null
@@ -118,7 +127,7 @@ async function ensureHiddenWebWindow(provider) {
   if (!window || window.isDestroyed()) {
     window = new BrowserWindow({
       show: false,
-      webPreferences: { partition: `persist:token-balance-${provider.id}`, contextIsolation: true, nodeIntegration: false },
+      webPreferences: webPreferencesFor(provider),
     })
     hiddenWebWindows.set(provider.id, window)
   }
@@ -130,10 +139,32 @@ async function fetchWeb(provider, previous = {}) {
     const window = await ensureHiddenWebWindow(provider)
     await window.loadURL(provider.balanceUrl)
     const data = await window.webContents.executeJavaScript(`(${extractPageData.toString()})()`, true)
-    if (data.balance == null) return { ...provider, ...previous, status: 'needs_login', errorMessage: 'Open the provider session and sign in to refresh this balance.' }
+    if (data.balance == null) {
+      return {
+        ...provider,
+        ...previous,
+        status: previous.balance != null ? 'cached' : 'needs_login',
+        errorMessage: previous.balance != null ? '已显示上次同步的余额。请打开登录会话重新同步。' : '请打开登录会话并完成登录。',
+      }
+    }
     return { ...provider, ...previous, ...data, status: 'ok', updatedAt: new Date().toISOString() }
   } catch (error) {
     return { ...provider, ...previous, balance: previous.balance ?? null, status: 'needs_login', errorMessage: error.message }
+  }
+}
+
+async function captureVisibleWebBalance(provider, contents) {
+  try {
+    const data = await contents.executeJavaScript(`(${extractPageData.toString()})()`, true)
+    if (data.balance == null) return false
+    const providers = appState.providers.map((item) => item.id === provider.id
+      ? { ...provider, ...item, ...data, status: 'ok', updatedAt: new Date().toISOString(), errorMessage: '' }
+      : item)
+    appState = { providers }
+    mainWindow?.webContents.send('balances-updated', appState)
+    return true
+  } catch {
+    return false
   }
 }
 
@@ -160,11 +191,16 @@ async function openProviderPage(id, page) {
   const window = new BrowserWindow({
     width: 1180,
     height: 820,
-    title: `${provider.name} session`,
-    webPreferences: { partition: `persist:token-balance-${provider.id}`, contextIsolation: true, nodeIntegration: false },
+    title: `${provider.name} \u767b\u5f55\u4f1a\u8bdd`,
+    webPreferences: webPreferencesFor(provider),
   })
+  const providerSession = window.webContents.session
+  window.webContents.on('did-finish-load', () => captureVisibleWebBalance(provider, window.webContents))
   await window.loadURL(url)
-  window.on('closed', refreshAll)
+  window.on('closed', async () => {
+    await providerSession.cookies.flushStore().catch(() => {})
+    await refreshAll()
+  })
 }
 
 function createMainWindow() {
@@ -173,7 +209,7 @@ function createMainWindow() {
     height: 820,
     minWidth: 900,
     minHeight: 620,
-    title: 'Token Balance',
+    title: '\u4f59\u989d\u4e2d\u5fc3',
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true },
   })
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'))
@@ -187,7 +223,8 @@ ipcMain.handle('provider:save', async (_, input) => {
   const credentials = await readCredentials()
   const existing = config.providers.find((provider) => provider.id === input.id)
   if (!existing) throw new Error('Unknown provider')
-  Object.assign(existing, { manualBalance: input.manualBalance, currency: input.currency || existing.currency })
+  if (input.manualBalance !== undefined) existing.manualBalance = input.manualBalance
+  existing.currency = input.currency || existing.currency
   if (typeof input.apiKey === 'string' && input.apiKey) credentials[input.id] = input.apiKey
   if (input.clearApiKey) delete credentials[input.id]
   await writeConfig(config)

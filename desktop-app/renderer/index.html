@@ -3,19 +3,20 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Token Balance</title>
+    <title>&#20313;&#39069;&#20013;&#24515;</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <header class="topbar">
-      <div class="brand"><span class="mark">TB</span><div><h1>Token Balance</h1><p id="updated">准备连接服务商</p></div></div>
-      <div class="actions"><button id="addManual" class="secondary">添加手动余额</button><button id="refresh" class="primary">刷新全部</button></div>
+      <div class="brand"><span class="mark">&#20313;&#39069;</span><div><h1>&#20313;&#39069;&#20013;&#24515;</h1><p id="updated">&#20934;&#22791;&#36830;&#25509;&#26381;&#21153;&#21830;</p></div></div>
+      <div class="actions"><button id="manageProviders" class="secondary">&#26381;&#21153;&#21830;&#35774;&#32622;</button><button id="addManual" class="secondary">&#28155;&#21152;&#25163;&#21160;&#20313;&#39069;</button><button id="refresh" class="primary">&#21047;&#26032;&#20840;&#37096;</button></div>
     </header>
     <main>
       <section id="summary" class="summary"></section>
-      <section><div class="section-heading"><h2>服务商余额</h2><span>API 与本地网页登录会话</span></div><div id="providers" class="provider-grid"></div></section>
+      <section><div class="section-heading"><h2>&#26381;&#21153;&#21830;&#20313;&#39069;</h2><span>&#25509;&#21475;&#20313;&#39069;&#19982;&#26412;&#22320;&#32593;&#39029;&#30331;&#24405;&#20250;&#35805;</span></div><div id="providers" class="provider-grid"></div></section>
     </main>
-    <dialog id="editor"><form id="editorForm" method="dialog"><div class="dialog-header"><h2 id="editorTitle">配置服务商</h2><button type="button" id="closeEditor" class="icon-button" aria-label="关闭">x</button></div><div id="editorFields" class="form-fields"></div><div class="dialog-actions"><button type="button" id="cancelEditor" class="secondary">取消</button><button class="primary" value="save">保存</button></div></form></dialog>
+    <dialog id="editor"><form id="editorForm" method="dialog"><div class="dialog-header"><h2 id="editorTitle">&#37197;&#32622;&#26381;&#21153;&#21830;</h2><button type="button" id="closeEditor" class="icon-button" aria-label="&#20851;&#38381;">x</button></div><div id="editorFields" class="form-fields"></div><div class="dialog-actions"><button type="button" id="cancelEditor" class="secondary">&#21462;&#28040;</button><button class="primary" value="save">&#20445;&#23384;</button></div></form></dialog>
+    <dialog id="manager"><div class="dialog-header"><h2>&#26381;&#21153;&#21830;&#35774;&#32622;</h2><button type="button" id="closeManager" class="icon-button" aria-label="&#20851;&#38381;">x</button></div><div id="managerList" class="manager-list"></div></dialog>
     <script src="app.js"></script>
   </body>
 </html>
