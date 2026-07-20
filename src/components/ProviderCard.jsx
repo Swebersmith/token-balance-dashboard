@@ -20,6 +20,7 @@ export default function ProviderCard({ data }) {
     ok: <CheckCircle className="w-4 h-4 text-emerald-500" />,
     configured: <HelpCircle className="w-4 h-4 text-amber-500" />,
     error: <AlertCircle className="w-4 h-4 text-red-500" />,
+    unsupported: <HelpCircle className="w-4 h-4 text-amber-500" />,
     unconfigured: <HelpCircle className="w-4 h-4 text-gray-400" />,
   }
 
@@ -27,6 +28,7 @@ export default function ProviderCard({ data }) {
     ok: '正常',
     configured: '已配置',
     error: '错误',
+    unsupported: '不支持',
     unconfigured: '未配置',
   }
 
@@ -86,7 +88,7 @@ export default function ProviderCard({ data }) {
           <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg p-2">
             {data.errorMessage || '查询失败'}
           </div>
-        ) : data.status === 'configured' ? (
+        ) : data.status === 'configured' || data.status === 'unsupported' ? (
           <div className="text-sm text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-lg p-2">
             {data.note || '请前往官网查看余额'}
           </div>

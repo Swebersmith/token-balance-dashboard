@@ -1,16 +1,34 @@
-# React + Vite
+# Token Balance Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Cloudflare Pages dashboard for checking AI provider credit balances. Provider API keys remain server-side in Cloudflare Pages environment variables and are never sent to the browser.
 
-Currently, two official plugins are available:
+## Configure
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Copy `.dev.vars.example` to `.dev.vars` and set only the provider keys you use. For deployment, add the same variables under Cloudflare Pages > Settings > Variables and Secrets.
 
-## React Compiler
+```powershell
+Copy-Item .dev.vars.example .dev.vars
+npm install
+npm run dev:pages
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The local site and API are then available at `http://localhost:8788`. `npm run dev` starts only Vite's frontend server, so use `dev:pages` when testing API-backed balances.
 
-## Expanding the Oxlint configuration
+## Balance API
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+`GET /api/balance` returns balances for configured providers.
+
+`GET /api/balance/:provider` returns one provider. Supported identifiers are `openai`, `anthropic`, `deepseek`, `google`, `groq`, `openrouter`, and `together`.
+
+```json
+{
+  "provider": "deepseek",
+  "balance": 12.34,
+  "currency": "CNY",
+  "status": "ok"
+}
+```
+
+Possible statuses: `ok`, `unconfigured`, `unsupported`, and `error`. `error` includes `errorMessage` and never exposes a provider API key.
+
+Google AI and Groq do not provide a key-scoped balance API. Anthropic balance lookup requires an Admin API key with billing access; a standard Anthropic API key will return `error` rather than a fabricated balance.

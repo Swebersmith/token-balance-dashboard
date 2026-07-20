@@ -5,28 +5,13 @@ import BalanceOverview from '../components/BalanceOverview'
 import ProviderGrid from '../components/ProviderGrid'
 import PaymentPanel from '../components/PaymentPanel'
 import PricingPanel from '../components/PricingPanel'
-import { Info } from 'lucide-react'
 
 export function Dashboard() {
-  const { balances, loading, error, demoMode } = useBalance()
+  const { balances, loading, error } = useBalance()
   useRefreshTimer()
 
   return (
     <Layout>
-      {demoMode && (
-        <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-900/30 rounded-xl p-3 sm:p-4 flex items-start gap-3">
-          <Info className="w-5 h-5 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-medium text-indigo-800 dark:text-indigo-300">
-              演示模式
-            </p>
-            <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-0.5">
-              当前显示的是示例数据。在 Cloudflare Dashboard 中配置 API 密钥后将显示真实余额。
-            </p>
-          </div>
-        </div>
-      )}
-
       <BalanceOverview />
 
       {error && (

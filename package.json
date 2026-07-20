@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:pages": "npm run build && wrangler pages dev dist --local --port 8788",
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview"
