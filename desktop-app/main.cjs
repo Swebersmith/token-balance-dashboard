@@ -63,6 +63,16 @@ function amount(value) {
   return Number.isFinite(parsed) ? parsed : null
 }
 
+function webUrl(value, fallback = '') {
+  if (typeof value !== 'string' || !value.trim()) return fallback
+  try {
+    const url = new URL(value.trim())
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : fallback
+  } catch {
+    return fallback
+  }
+}
+
 function webPreferencesFor(provider) {
   return { session: session.fromPartition(`persist:token-balance-${provider.id}`), contextIsolation: true, nodeIntegration: false }
 }
@@ -105,14 +115,18 @@ async function fetchDirect(provider, apiKey) {
   }
 }
 
-function extractPageData() {
+function extractPageData(balanceKeyword = '') {
   const text = document.body.innerText || ''
-  const balanceMatch = [
+  const keyword = typeof balanceKeyword === 'string' ? balanceKeyword.trim() : ''
+  const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const patterns = [
     /(?:\u8d26\u6237)?\u4f59\u989d\s*[:\uff1a]?\s*([\u00a5\uffe5$])?\s*([\d,]+(?:\.\d+)?)/i,
     /(?:account\s*)?balance\s*[:\uff1a]?\s*([\u00a5\uffe5$])?\s*([\d,]+(?:\.\d+)?)/i,
     /(?:available\s*)?credits?\s*[:\uff1a]?\s*([\u00a5\uffe5$])?\s*([\d,]+(?:\.\d+)?)/i,
     /remaining\s*(?:balance|credits?)\s*[:\uff1a]?\s*([\u00a5\uffe5$])?\s*([\d,]+(?:\.\d+)?)/i,
-  ].map((pattern) => text.match(pattern)).find(Boolean)
+  ]
+  if (escapedKeyword) patterns.unshift(new RegExp(`${escapedKeyword}\\s*[:\\uff1a]?\\s*([\\u00a5\\uffe5$])?\\s*([\\d,]+(?:\\.\\d+)?)`, 'i'))
+  const balanceMatch = patterns.map((pattern) => text.match(pattern)).find(Boolean)
   const balance = balanceMatch ? Number(balanceMatch[2].replaceAll(',', '')) : null
   const currency = balanceMatch?.[1] === '\u00a5' || balanceMatch?.[1] === '\uffe5' ? 'CNY' : 'USD'
   const models = Array.from(document.querySelectorAll('table tr')).slice(1, 21).map((row) => {
@@ -120,6 +134,33 @@ function extractPageData() {
     return values.length >= 2 ? { name: values[0], price: values.slice(1).join(' ') } : null
   }).filter(Boolean)
   return { balance: Number.isFinite(balance) ? balance : null, currency, models }
+}
+
+async function extractRunapiData() {
+  const profileResponse = await fetch('/api/user/self', { credentials: 'include' })
+  const profile = await profileResponse.json()
+  const user = profile?.data?.user || profile?.data || profile
+  const quota = Number(user?.quota)
+  if (!Number.isFinite(quota)) return { balance: null, currency: 'USD', models: [] }
+  let quotaPerUnit = Number(localStorage.getItem('quota_per_unit'))
+  let status = null
+  try {
+    const statusResponse = await fetch('/api/status', { credentials: 'include' })
+    status = await statusResponse.json()
+    quotaPerUnit = Number(status?.data?.quota_per_unit) || quotaPerUnit
+  } catch {}
+  if (!Number.isFinite(quotaPerUnit) || quotaPerUnit <= 0) return { balance: null, currency: 'USD', models: [] }
+  const displayType = localStorage.getItem('quota_display_type') || 'USD'
+  if (displayType === 'CNY') {
+    const exchangeRate = Number(status?.data?.usd_exchange_rate) || 1
+    return { balance: quota / quotaPerUnit * exchangeRate, currency: 'CNY', models: [] }
+  }
+  return { balance: quota / quotaPerUnit, currency: 'USD', models: [] }
+}
+
+async function readWebBalance(provider, contents) {
+  if (provider.id === 'runapi') return contents.executeJavaScript(`(${extractRunapiData.toString()})()`, true)
+  return contents.executeJavaScript(`(${extractPageData.toString()})(${JSON.stringify(provider.balanceKeyword || '')})`, true)
 }
 
 async function ensureHiddenWebWindow(provider) {
@@ -138,7 +179,7 @@ async function fetchWeb(provider, previous = {}) {
   try {
     const window = await ensureHiddenWebWindow(provider)
     await window.loadURL(provider.balanceUrl)
-    const data = await window.webContents.executeJavaScript(`(${extractPageData.toString()})()`, true)
+    const data = await readWebBalance(provider, window.webContents)
     if (data.balance == null) {
       return {
         ...provider,
@@ -155,7 +196,7 @@ async function fetchWeb(provider, previous = {}) {
 
 async function captureVisibleWebBalance(provider, contents) {
   try {
-    const data = await contents.executeJavaScript(`(${extractPageData.toString()})()`, true)
+    const data = await readWebBalance(provider, contents)
     if (data.balance == null) return false
     const providers = appState.providers.map((item) => item.id === provider.id
       ? { ...provider, ...item, ...data, status: 'ok', updatedAt: new Date().toISOString(), errorMessage: '' }
@@ -223,8 +264,16 @@ ipcMain.handle('provider:save', async (_, input) => {
   const credentials = await readCredentials()
   const existing = config.providers.find((provider) => provider.id === input.id)
   if (!existing) throw new Error('Unknown provider')
+  if (typeof input.name === 'string' && input.name.trim()) existing.name = input.name.trim()
   if (input.manualBalance !== undefined) existing.manualBalance = input.manualBalance
   existing.currency = input.currency || existing.currency
+  if (typeof input.website === 'string') existing.website = webUrl(input.website, existing.website)
+  if (existing.kind === 'web') {
+    if (typeof input.balanceUrl === 'string') existing.balanceUrl = webUrl(input.balanceUrl, existing.balanceUrl || existing.website)
+    if (typeof input.rechargeUrl === 'string') existing.rechargeUrl = webUrl(input.rechargeUrl)
+    if (typeof input.pricingUrl === 'string') existing.pricingUrl = webUrl(input.pricingUrl)
+    if (typeof input.balanceKeyword === 'string') existing.balanceKeyword = input.balanceKeyword.trim().slice(0, 80)
+  }
   if (typeof input.apiKey === 'string' && input.apiKey) credentials[input.id] = input.apiKey
   if (input.clearApiKey) delete credentials[input.id]
   await writeConfig(config)
@@ -246,6 +295,29 @@ ipcMain.handle('provider:add-manual', async (_, input) => {
     currency: input?.currency === 'CNY' ? 'CNY' : 'USD',
     color: '#7c3aed',
     website: typeof input?.website === 'string' ? input.website.trim() : '',
+  })
+  await writeConfig(config)
+  return refreshAll()
+})
+ipcMain.handle('provider:add-web', async (_, input) => {
+  const name = typeof input?.name === 'string' ? input.name.trim() : ''
+  const website = webUrl(input?.website)
+  const balanceUrl = webUrl(input?.balanceUrl, website)
+  if (!name || !balanceUrl) throw new Error('A provider name and balance page URL are required')
+  const config = await readConfig()
+  const slug = name.toLowerCase().replace(/[^a-z0-9-]/g, '-') || `source-${Date.now()}`
+  const id = `web-${slug}-${Date.now().toString().slice(-5)}`
+  config.providers.push({
+    id,
+    name,
+    kind: 'web',
+    currency: input?.currency === 'CNY' ? 'CNY' : 'USD',
+    color: '#d946ef',
+    website: website || balanceUrl,
+    balanceUrl,
+    rechargeUrl: webUrl(input?.rechargeUrl),
+    pricingUrl: webUrl(input?.pricingUrl),
+    balanceKeyword: typeof input?.balanceKeyword === 'string' ? input.balanceKeyword.trim().slice(0, 80) : '',
   })
   await writeConfig(config)
   return refreshAll()

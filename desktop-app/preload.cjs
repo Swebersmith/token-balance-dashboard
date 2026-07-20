@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('desktop', {
   refreshBalances: () => ipcRenderer.invoke('balances:refresh'),
   saveProvider: (provider) => ipcRenderer.invoke('provider:save', provider),
   addManualProvider: (provider) => ipcRenderer.invoke('provider:add-manual', provider),
+  addWebProvider: (provider) => ipcRenderer.invoke('provider:add-web', provider),
   openProvider: (id, page) => ipcRenderer.invoke('provider:open', id, page),
   onBalancesUpdated: (callback) => ipcRenderer.on('balances-updated', (_, state) => callback(state)),
 })

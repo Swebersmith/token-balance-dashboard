@@ -8,13 +8,15 @@ const editorForm = document.getElementById('editorForm')
 const editorFields = document.getElementById('editorFields')
 const managerList = document.getElementById('managerList')
 let editTarget = null
+let editorMode = 'manual'
 
 const text = {
   estimatedTotal: '\u4f30\u7b97\u603b\u4f59\u989d', updated: '\u5df2\u66f4\u65b0', needsLogin: '\u9700\u8981\u767b\u5f55', apiConfigured: '\u53ef\u914d\u7f6e API',
   normal: '\u6b63\u5e38', cached: '\u7f13\u5b58\u4f59\u989d', unconfigured: '\u672a\u914d\u7f6e', loginRequired: '\u9700\u8981\u767b\u5f55', failed: '\u67e5\u8be2\u5931\u8d25', unknown: '\u672a\u77e5\u72b6\u6001',
   updatedAt: '\u66f4\u65b0\u4e8e', notConfigured: '\u5c1a\u672a\u914d\u7f6e', modelPricing: '\u6a21\u578b\u5b9a\u4ef7',
   configure: '\u914d\u7f6e', loginSession: '\u767b\u5f55\u4f1a\u8bdd', recharge: '\u5145\u503c', pricing: '\u5b9a\u4ef7',
-  configureTitle: '\u914d\u7f6e\u670d\u52a1\u5546', addManual: '\u6dfb\u52a0\u624b\u52a8\u4f59\u989d', name: '\u670d\u52a1\u5546\u540d\u79f0', balance: '\u5f53\u524d\u4f59\u989d', currency: '\u5e01\u79cd', website: '\u5b98\u7f51\uff08\u53ef\u9009\uff09',
+  configureTitle: '\u914d\u7f6e\u670d\u52a1\u5546', addManual: '\u6dfb\u52a0\u624b\u52a8\u4f59\u989d', addWeb: '\u6dfb\u52a0\u7f51\u7ad9\u670d\u52a1\u5546', name: '\u670d\u52a1\u5546\u540d\u79f0', balance: '\u5f53\u524d\u4f59\u989d', currency: '\u5e01\u79cd', website: '\u5b98\u7f51\uff08\u53ef\u9009\uff09',
+  balancePage: '\u4f59\u989d\u9875\u7f51\u5740', rechargePage: '\u5145\u503c\u9875\u7f51\u5740\uff08\u53ef\u9009\uff09', pricingPage: '\u5b9a\u4ef7\u9875\u7f51\u5740\uff08\u53ef\u9009\uff09', balanceKeyword: '\u4f59\u989d\u5b57\u6bb5\u6587\u5b57\uff08\u53ef\u9009\uff09',
   keepKey: '\u7559\u7a7a\u4fdd\u7559\u73b0\u6709\u5bc6\u94a5', encrypted: '\u5bc6\u94a5\u7531 Windows \u52a0\u5bc6\u5b58\u50a8\uff0c\u4ec5\u672c\u673a\u5e94\u7528\u53ef\u8bfb\u53d6\u3002', webHint: '\u70b9\u51fb\u201c\u767b\u5f55\u4f1a\u8bdd\u201d\u540e\u5728\u5e94\u7528\u5185\u5b8c\u6210\u767b\u5f55\u3002\u4f1a\u8bdd\u4f1a\u4fdd\u5b58\u5728\u672c\u673a\uff0c\u4f59\u989d\u4f1a\u81ea\u52a8\u5237\u65b0\u3002',
   apiBalance: 'API \u4f59\u989d', webSession: '\u7f51\u9875\u767b\u5f55\u4f1a\u8bdd', manualBalance: '\u624b\u52a8\u4f59\u989d', recentRefresh: '\u6700\u8fd1\u5237\u65b0\uff1a', providerCount: '\u4e2a\u670d\u52a1\u5546',
 }
@@ -44,16 +46,22 @@ function render(next) {
 
 function field(label, control) { return `<div class="field"><label>${label}</label>${control}</div>` }
 
-function showEditor(provider, manualOnly = false) {
+function showEditor(provider, mode = 'manual') {
   editTarget = provider
-  document.getElementById('editorTitle').textContent = provider ? `${text.configureTitle} ${provider.name}` : text.addManual
-  if (manualOnly) {
+  editorMode = mode
+  document.getElementById('editorTitle').textContent = provider ? `${text.configureTitle} ${provider.name}` : (mode === 'web' ? text.addWeb : text.addManual)
+  if (!provider && mode === 'manual') {
     editorFields.innerHTML = `${field(text.name, '<input name="name" required />')}${field(text.balance, '<input name="manualBalance" type="number" step="0.0001" required />')}${field(text.currency, '<select name="currency"><option value="USD">USD</option><option value="CNY">CNY</option></select>')}${field(text.website, '<input name="website" type="url" />')}`
+  } else if (!provider && mode === 'web') {
+    editorFields.innerHTML = `${field(text.name, '<input name="name" required />')}${field(text.website, '<input name="website" type="url" placeholder="https://example.com" />')}${field(text.balancePage, '<input name="balanceUrl" type="url" required placeholder="https://example.com/account" />')}${field(text.balanceKeyword, '<input name="balanceKeyword" placeholder="Balance / 余额 / Credits" />')}${field(text.currency, '<select name="currency"><option value="USD">USD</option><option value="CNY">CNY</option></select>')}${field(text.rechargePage, '<input name="rechargeUrl" type="url" />')}${field(text.pricingPage, '<input name="pricingUrl" type="url" />')}`
   } else {
     const apiField = provider.kind === 'api' ? field('API Key', `<input name="apiKey" type="password" placeholder="${text.keepKey}" /><p class="hint">${text.encrypted}</p>`) : ''
     const manualField = provider.kind === 'manual' ? field(text.balance, `<input name="manualBalance" type="number" step="0.0001" value="${escapeHtml(provider.manualBalance)}" />`) : ''
     const webHint = provider.kind === 'web' ? `<p class="hint">${text.webHint}</p>` : ''
-    editorFields.innerHTML = `${apiField}${manualField}${field(text.currency, `<select name="currency"><option value="USD" ${provider.currency === 'USD' ? 'selected' : ''}>USD</option><option value="CNY" ${provider.currency === 'CNY' ? 'selected' : ''}>CNY</option></select>`)}${webHint}`
+    const nameField = field(text.name, `<input name="name" value="${escapeHtml(provider.name)}" required />`)
+    const websiteField = provider.kind !== 'api' ? field(text.website, `<input name="website" type="url" value="${escapeHtml(provider.website)}" />`) : ''
+    const webFields = provider.kind === 'web' ? `${field(text.balancePage, `<input name="balanceUrl" type="url" value="${escapeHtml(provider.balanceUrl)}" required />`)}${field(text.balanceKeyword, `<input name="balanceKeyword" value="${escapeHtml(provider.balanceKeyword)}" placeholder="Balance / 余额 / Credits" />`)}${field(text.rechargePage, `<input name="rechargeUrl" type="url" value="${escapeHtml(provider.rechargeUrl)}" />`)}${field(text.pricingPage, `<input name="pricingUrl" type="url" value="${escapeHtml(provider.pricingUrl)}" />`)}` : ''
+    editorFields.innerHTML = `${nameField}${apiField}${manualField}${websiteField}${webFields}${field(text.currency, `<select name="currency"><option value="USD" ${provider.currency === 'USD' ? 'selected' : ''}>USD</option><option value="CNY" ${provider.currency === 'CNY' ? 'selected' : ''}>CNY</option></select>`)}${webHint}`
   }
   dialog.showModal()
 }
@@ -74,7 +82,8 @@ providerGrid.addEventListener('click', async (event) => {
   if (button.dataset.action === 'pricing') await window.desktop.openProvider(provider.id, 'pricing')
 })
 
-document.getElementById('addManual').addEventListener('click', () => showEditor(null, true))
+document.getElementById('addManual').addEventListener('click', () => showEditor(null, 'manual'))
+document.getElementById('addWeb').addEventListener('click', () => showEditor(null, 'web'))
 document.getElementById('manageProviders').addEventListener('click', showManager)
 document.getElementById('closeManager').addEventListener('click', () => manager.close())
 managerList.addEventListener('click', (event) => {
@@ -90,7 +99,8 @@ editorForm.addEventListener('submit', async (event) => {
   event.preventDefault()
   const data = Object.fromEntries(new FormData(editorForm).entries())
   try {
-    if (!editTarget) await window.desktop.addManualProvider(data)
+    if (!editTarget && editorMode === 'web') await window.desktop.addWebProvider(data)
+    else if (!editTarget) await window.desktop.addManualProvider(data)
     else await window.desktop.saveProvider({ id: editTarget.id, ...data, manualBalance: data.manualBalance === undefined ? undefined : Number(data.manualBalance) })
     dialog.close()
   } catch (error) {
