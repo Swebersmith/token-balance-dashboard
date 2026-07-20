@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, safeStorage, session, shell } = require('electron')
+const { app, BrowserWindow, ipcMain, Menu, nativeImage, safeStorage, session, shell, Tray } = require('electron')
 const fs = require('fs/promises')
 const path = require('path')
 
@@ -15,6 +15,8 @@ const WEB_PROVIDERS = {
 }
 
 let mainWindow
+let tray
+let isQuitting = false
 const hiddenWebWindows = new Map()
 let appState = { providers: [] }
 
@@ -264,6 +266,31 @@ function createMainWindow() {
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true },
   })
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'))
+  mainWindow.on('close', (event) => {
+    if (isQuitting) return
+    event.preventDefault()
+    mainWindow.hide()
+  })
+}
+
+function showMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) createMainWindow()
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  mainWindow.show()
+  mainWindow.focus()
+}
+
+function createTray() {
+  const icon = nativeImage.createFromPath(path.join(__dirname, 'renderer', 'tray-icon.svg'))
+  tray = new Tray(icon)
+  tray.setToolTip('\u4f59\u989d\u4e2d\u5fc3\u6b63\u5728\u540e\u53f0\u8fd0\u884c')
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: '\u663e\u793a\u4f59\u989d\u4e2d\u5fc3', click: showMainWindow },
+    { label: '\u7acb\u5373\u5237\u65b0\u4f59\u989d', click: () => refreshAll() },
+    { type: 'separator' },
+    { label: '\u9000\u51fa\u7a0b\u5e8f', click: () => { isQuitting = true; app.quit() } },
+  ]))
+  tray.on('click', showMainWindow)
 }
 
 ipcMain.handle('balances:get', refreshAll)
@@ -349,10 +376,13 @@ ipcMain.handle('provider:delete', async (_, id) => {
 
 app.whenReady().then(async () => {
   createMainWindow()
+  createTray()
   await refreshAll()
   setInterval(refreshAll, 5 * 60 * 1000)
 })
 
+app.on('before-quit', () => { isQuitting = true })
+
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
+  if (process.platform === 'darwin') app.dock?.hide()
 })
