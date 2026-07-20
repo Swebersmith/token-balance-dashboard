@@ -6,10 +6,12 @@ const CORS = {
 }
 
 export async function onRequest(context) {
+  const isAdminRequest = new URL(context.request.url).pathname.startsWith('/api/admin/')
   if (context.request.method === 'OPTIONS') {
-    return new Response(null, { headers: CORS })
+    return new Response(null, { headers: isAdminRequest ? {} : CORS })
   }
   const res = await context.next()
+  if (isAdminRequest) return res
   const modified = new Response(res.body, res)
   for (const [k, v] of Object.entries(CORS)) {
     modified.headers.set(k, v)

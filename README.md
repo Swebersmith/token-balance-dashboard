@@ -14,7 +14,11 @@ npm run dev:pages
 
 The local site and API are then available at `http://localhost:8788`. `npm run dev` starts only Vite's frontend server, so use `dev:pages` when testing API-backed balances.
 
-Do not enter an API key in the `/admin` page. That page is client-side and cannot safely configure the server. The balance API URLs are built in; set the provider-issued key as the corresponding server environment variable:
+## Web Admin
+
+The deployed site has a protected `/admin` page. Sign in with the administrator password, open the `API 密钥` tab, paste a provider key, and click `保存`. The key is stored in Cloudflare KV and becomes available to the balance API immediately; it is never returned to the browser after saving. You can configure or replace keys from this page at any time without editing a file or visiting Cloudflare.
+
+The balance API URLs are built in. The server configuration uses these variable names internally:
 
 | Provider | Environment variable | Built-in balance API |
 | --- | --- | --- |
@@ -23,6 +27,8 @@ Do not enter an API key in the `/admin` page. That page is client-side and canno
 | DeepSeek | `DEEPSEEK_API_KEY` | `https://api.deepseek.com/user/balance` |
 | OpenRouter | `OPENROUTER_API_KEY` | `https://openrouter.ai/api/v1/credits` |
 | Together AI | `TOGETHER_API_KEY` | `https://api.together.xyz/v1/billing/credits` |
+
+For local-only development, `.dev.vars` remains supported as a fallback when no KV binding is available.
 
 ## Balance API
 

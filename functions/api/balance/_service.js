@@ -1,4 +1,4 @@
-const PROVIDERS = {
+export const PROVIDERS = {
   openai: { envKey: 'OPENAI_API_KEY', currency: 'USD' },
   anthropic: { envKey: 'ANTHROPIC_API_KEY', currency: 'USD' },
   deepseek: { envKey: 'DEEPSEEK_API_KEY', currency: 'CNY' },
@@ -114,17 +114,55 @@ const UNSUPPORTED = {
   groq: 'Groq does not expose a balance endpoint for API keys.',
 }
 
-export function configuredProviderIds(env) {
-  return Object.entries(PROVIDERS)
-    .filter(([, config]) => Boolean(env[config.envKey]))
-    .map(([provider]) => provider)
+export function isKnownProvider(provider) {
+  return Boolean(PROVIDERS[provider])
+}
+
+async function getProviderKey(env, provider) {
+  const config = PROVIDERS[provider]
+  if (!config) return null
+  const stored = env.BALANCE_SETTINGS
+    ? await env.BALANCE_SETTINGS.get(`provider:${provider}`, { type: 'json' })
+    : null
+  return stored?.apiKey || env[config.envKey] || null
+}
+
+export async function getProviderConfiguration(env, provider) {
+  const config = PROVIDERS[provider]
+  if (!config) return null
+  return { envKey: config.envKey, configured: Boolean(await getProviderKey(env, provider)) }
+}
+
+export async function getProviderSettings(env) {
+  const entries = await Promise.all(Object.keys(PROVIDERS).map(async (provider) => [
+    provider,
+    await getProviderConfiguration(env, provider),
+  ]))
+  return Object.fromEntries(entries)
+}
+
+export async function saveProviderKey(env, provider, apiKey) {
+  if (!env.BALANCE_SETTINGS || !isKnownProvider(provider)) throw new Error('Configuration storage is not available')
+  const storageKey = `provider:${provider}`
+  if (!apiKey) {
+    await env.BALANCE_SETTINGS.delete(storageKey)
+    return
+  }
+  await env.BALANCE_SETTINGS.put(storageKey, JSON.stringify({ apiKey, updatedAt: new Date().toISOString() }))
+}
+
+export async function configuredProviderIds(env) {
+  const providers = await Promise.all(Object.keys(PROVIDERS).map(async (provider) => (
+    await getProviderKey(env, provider) ? provider : null
+  )))
+  return providers.filter(Boolean)
 }
 
 export async function getProviderBalance(env, provider) {
   const config = PROVIDERS[provider]
   if (!config) return null
 
-  const key = env[config.envKey]
+  const key = await getProviderKey(env, provider)
   if (!key) {
     return { provider, balance: null, currency: config.currency, status: 'unconfigured' }
   }

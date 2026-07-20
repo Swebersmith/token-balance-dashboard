@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ArrowLeft, Plus, Trash2, Save, Settings, DollarSign, Link, Database, RotateCcw, AlertTriangle } from 'lucide-react'
 import { useAdmin } from '../context/AdminContext'
 import Layout from '../components/Layout'
+import { changeAdminPassword, getAdminSettings, loginAdmin, logoutAdmin, saveAdminProviderKey } from '../utils/adminApi'
 
 const BALANCE_CONFIG = {
   openai: {
@@ -50,8 +51,183 @@ function BalanceConfiguration({ providerId }) {
       <p className="font-medium">余额查询由服务端托管</p>
       <p className="mt-1">环境变量：<code className="font-mono">{config.envKey}</code></p>
       {config.endpoint && <p className="mt-1 break-all">内置 API 地址：<code className="font-mono">{config.endpoint}</code></p>}
-      <p className="mt-1">请在 Cloudflare Pages 的 Variables and Secrets，或本地 <code className="font-mono">.dev.vars</code> 中设置 API Key。不要在此页面输入密钥。</p>
+      <p className="mt-1">请在“API 密钥”标签中保存密钥。密钥只会写入服务端存储，不会显示回页面。</p>
       {config.note && <p className="mt-1">{config.note}</p>}
+    </div>
+  )
+}
+
+function AdminLogin({ onAuthenticated }) {
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  const submit = async (event) => {
+    event.preventDefault()
+    setSubmitting(true)
+    setError('')
+    try {
+      await loginAdmin(password)
+      setPassword('')
+      onAuthenticated()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Layout>
+      <div className="mx-auto max-w-sm pt-10">
+        <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <h1 className="text-lg font-semibold text-gray-900 dark:text-white">后台登录</h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">登录后可安全保存服务商 API 密钥。</p>
+          <form onSubmit={submit} className="mt-5 space-y-3">
+            <div>
+              <label htmlFor="admin-password" className="mb-1 block text-xs font-medium text-gray-500">管理员密码</label>
+              <input
+                id="admin-password"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
+                className="w-full rounded-lg border px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              />
+            </div>
+            {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {submitting ? '登录中...' : '登录'}
+            </button>
+          </form>
+        </div>
+      </div>
+    </Layout>
+  )
+}
+
+function ApiKeySettings() {
+  const [settings, setSettings] = useState({})
+  const [drafts, setDrafts] = useState({})
+  const [busyProvider, setBusyProvider] = useState(null)
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
+  const [passwords, setPasswords] = useState({ current: '', next: '' })
+  const [changingPassword, setChangingPassword] = useState(false)
+
+  const refresh = async () => {
+    try {
+      const data = await getAdminSettings()
+      setSettings(data.providers)
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  useEffect(() => {
+    refresh()
+  }, [])
+
+  const saveKey = async (provider) => {
+    setBusyProvider(provider)
+    setError('')
+    setMessage('')
+    try {
+      const data = await saveAdminProviderKey(provider, drafts[provider] || '')
+      setSettings((current) => ({ ...current, [provider]: data }))
+      setDrafts((current) => ({ ...current, [provider]: '' }))
+      setMessage(`${BALANCE_CONFIG[provider].envKey} 已保存`)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusyProvider(null)
+    }
+  }
+
+  const updatePassword = async (event) => {
+    event.preventDefault()
+    setChangingPassword(true)
+    setError('')
+    setMessage('')
+    try {
+      await changeAdminPassword(passwords.current, passwords.next)
+      setPasswords({ current: '', next: '' })
+      setMessage('管理员密码已更新')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setChangingPassword(false)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-gray-500 dark:text-gray-400">密钥保存到 Cloudflare KV，仅服务端余额查询可读取。已保存的密钥不会再次显示；清空输入框并保存可删除该服务商密钥。</p>
+      {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-300">{error}</p>}
+      {message && <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">{message}</p>}
+      {Object.entries(BALANCE_CONFIG).map(([provider, config]) => (
+        <div key={provider} className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{provider}</h2>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{config.endpoint || config.note}</p>
+            </div>
+            <span className={`shrink-0 text-xs ${settings[provider]?.configured ? 'text-emerald-600' : 'text-gray-400'}`}>
+              {settings[provider]?.configured ? '已配置' : '未配置'}
+            </span>
+          </div>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <input
+              type="password"
+              autoComplete="off"
+              value={drafts[provider] || ''}
+              onChange={(event) => setDrafts((current) => ({ ...current, [provider]: event.target.value }))}
+              placeholder={`输入 ${config.envKey}`}
+              className="min-w-0 flex-1 rounded-lg border px-3 py-2 font-mono text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            />
+            <button
+              type="button"
+              onClick={() => saveKey(provider)}
+              disabled={busyProvider === provider}
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {busyProvider === provider ? '保存中...' : '保存'}
+            </button>
+          </div>
+        </div>
+      ))}
+      <form onSubmit={updatePassword} className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-white">修改管理员密码</h2>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <input
+            type="password"
+            autoComplete="current-password"
+            value={passwords.current}
+            onChange={(event) => setPasswords((current) => ({ ...current, current: event.target.value }))}
+            placeholder="当前密码"
+            required
+            className="rounded-lg border px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+          />
+          <input
+            type="password"
+            autoComplete="new-password"
+            value={passwords.next}
+            onChange={(event) => setPasswords((current) => ({ ...current, next: event.target.value }))}
+            placeholder="新密码，至少 12 位"
+            minLength={12}
+            required
+            className="rounded-lg border px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+          />
+        </div>
+        <button type="submit" disabled={changingPassword} className="mt-3 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">
+          {changingPassword ? '更新中...' : '更新密码'}
+        </button>
+      </form>
     </div>
   )
 }
@@ -213,9 +389,24 @@ function ProviderEditor({ provider, onSave, onDelete }) {
 
 export function Admin() {
   const { providers, removedBuiltins, addProvider, removeProvider, updateProvider, restoreBuiltins } = useAdmin()
-  const [tab, setTab] = useState('providers')
+  const [tab, setTab] = useState('api-keys')
   const [newId, setNewId] = useState('')
   const [editingId, setEditingId] = useState(null)
+  const [authState, setAuthState] = useState('loading')
+
+  useEffect(() => {
+    getAdminSettings()
+      .then(() => setAuthState('authenticated'))
+      .catch(() => setAuthState('unauthenticated'))
+  }, [])
+
+  if (authState === 'loading') {
+    return <Layout><p className="py-12 text-center text-sm text-gray-500">正在验证后台会话...</p></Layout>
+  }
+
+  if (authState === 'unauthenticated') {
+    return <AdminLogin onAuthenticated={() => setAuthState('authenticated')} />
+  }
 
   const handleAdd = () => {
     if (!newId.trim()) return
@@ -241,11 +432,19 @@ export function Admin() {
           <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
         </a>
         <h1 className="text-xl font-bold text-gray-900 dark:text-white">后台管理</h1>
+        <button
+          type="button"
+          onClick={async () => { await logoutAdmin(); setAuthState('unauthenticated') }}
+          className="ml-auto rounded-lg px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700"
+        >
+          退出登录
+        </button>
       </div>
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 dark:bg-gray-700 rounded-lg p-1 mb-6">
         {[
+          { id: 'api-keys', label: 'API 密钥', icon: Settings },
           { id: 'providers', label: '服务商管理', icon: Database },
           { id: 'pricing', label: '模型价格', icon: DollarSign },
           { id: 'recharge', label: '充值链接', icon: Link },
@@ -265,6 +464,8 @@ export function Admin() {
           </button>
         ))}
       </div>
+
+      {tab === 'api-keys' && <ApiKeySettings />}
 
       {/* Provider Management */}
       {tab === 'providers' && (

@@ -1,5 +1,11 @@
 {
-  "name": "token-balance-dashboard",
-  "compatibility_date": "2025-12-01",
-  "pages_build_output_dir": "dist"
+	"name": "token-balance-dashboard",
+	"compatibility_date": "2025-12-01",
+	"pages_build_output_dir": "dist",
+	"kv_namespaces": [
+		{
+			"binding": "BALANCE_SETTINGS",
+			"id": "56591bb4c8ac43b8a6b142fa43fc17af"
+		}
+	]
 }
