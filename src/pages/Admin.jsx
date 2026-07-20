@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { ArrowLeft, Plus, Trash2, Save, Settings, DollarSign, Link, Database, RotateCcw, AlertTriangle } from 'lucide-react'
 import { useAdmin } from '../context/AdminContext'
 import Layout from '../components/Layout'
-import { changeAdminPassword, getAdminSettings, loginAdmin, logoutAdmin, saveAdminProviderKey } from '../utils/adminApi'
+import { changeAdminPassword, deleteCustomProvider, getAdminSettings, getCustomProviders, loginAdmin, logoutAdmin, saveAdminProviderKey, saveCustomProvider } from '../utils/adminApi'
 
 const BALANCE_CONFIG = {
   openai: {
@@ -228,7 +228,124 @@ function ApiKeySettings() {
           {changingPassword ? '更新中...' : '更新密码'}
         </button>
       </form>
+      <CustomProviderSettings />
     </div>
+  )
+}
+
+function CustomProviderSettings() {
+  const [providers, setProviders] = useState([])
+  const [mode, setMode] = useState('manual')
+  const [form, setForm] = useState({
+    name: '',
+    currency: 'USD',
+    color: '#6366f1',
+    website: '',
+    manualBalance: '',
+    endpoint: '',
+    authType: 'bearer',
+    apiKey: '',
+    jsonPath: 'data.balance',
+  })
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const refresh = async () => {
+    try {
+      const data = await getCustomProviders()
+      setProviders(data.providers)
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  useEffect(() => {
+    refresh()
+  }, [])
+
+  const update = (field, value) => setForm((current) => ({ ...current, [field]: value }))
+
+  const submit = async (event) => {
+    event.preventDefault()
+    setSaving(true)
+    setError('')
+    setMessage('')
+    try {
+      const id = `custom-${form.name.toLowerCase().trim().replace(/[^a-z0-9-]/g, '-')}`
+      await saveCustomProvider({ ...form, id, mode, manualBalance: Number(form.manualBalance) })
+      setForm({ name: '', currency: 'USD', color: '#6366f1', website: '', manualBalance: '', endpoint: '', authType: 'bearer', apiKey: '', jsonPath: 'data.balance' })
+      await refresh()
+      setMessage('自定义余额来源已保存')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const remove = async (id) => {
+    if (!confirm('删除后将停止显示此服务商余额，是否继续？')) return
+    setError('')
+    try {
+      await deleteCustomProvider(id)
+      await refresh()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  return (
+    <section className="border-t border-gray-200 pt-6 dark:border-gray-700">
+      <div className="mb-3">
+        <h2 className="text-base font-semibold text-gray-900 dark:text-white">自定义余额来源</h2>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">没有公开余额 API 时可使用手动余额；有 API 时填写 HTTPS 地址、认证方式和返回余额的 JSON 字段路径。</p>
+      </div>
+      {error && <p className="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-300">{error}</p>}
+      {message && <p className="mb-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">{message}</p>}
+      <form onSubmit={submit} className="space-y-3 rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <input required value={form.name} onChange={(event) => update('name', event.target.value)} placeholder="服务商名称，例如 RunAPI" className="rounded-lg border px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white" />
+          <select value={mode} onChange={(event) => setMode(event.target.value)} className="rounded-lg border px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+            <option value="manual">手动余额</option>
+            <option value="api">API 查询</option>
+          </select>
+          <select value={form.currency} onChange={(event) => update('currency', event.target.value)} className="rounded-lg border px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+            <option value="USD">USD</option>
+            <option value="CNY">CNY</option>
+          </select>
+          <input value={form.website} onChange={(event) => update('website', event.target.value)} placeholder="服务商网站（可选）" className="rounded-lg border px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white" />
+        </div>
+        {mode === 'manual' ? (
+          <input required type="number" step="0.0001" value={form.manualBalance} onChange={(event) => update('manualBalance', event.target.value)} placeholder="当前余额" className="w-full rounded-lg border px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white" />
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <input required type="url" value={form.endpoint} onChange={(event) => update('endpoint', event.target.value)} placeholder="HTTPS 余额 API 地址" className="sm:col-span-2 rounded-lg border px-3 py-2 font-mono text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white" />
+            <input required type="password" value={form.apiKey} onChange={(event) => update('apiKey', event.target.value)} placeholder="API Key 或账户 Access Token" className="rounded-lg border px-3 py-2 font-mono text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white" />
+            <select value={form.authType} onChange={(event) => update('authType', event.target.value)} className="rounded-lg border px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+              <option value="bearer">Authorization: Bearer</option>
+              <option value="x-api-key">X-API-Key</option>
+            </select>
+            <input required value={form.jsonPath} onChange={(event) => update('jsonPath', event.target.value)} placeholder="余额 JSON 字段，例如 data.balance" className="sm:col-span-2 rounded-lg border px-3 py-2 font-mono text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white" />
+          </div>
+        )}
+        <button type="submit" disabled={saving} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
+          {saving ? '保存中...' : '保存并显示'}
+        </button>
+      </form>
+      {providers.length > 0 && (
+        <div className="mt-3 space-y-2">
+          {providers.map((provider) => (
+            <div key={provider.id} className="flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800">
+              <span className="h-3 w-3 rounded-full" style={{ backgroundColor: provider.color }} />
+              <span className="font-medium text-gray-900 dark:text-white">{provider.name}</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">{provider.mode === 'manual' ? '手动余额' : provider.jsonPath}</span>
+              <button type="button" onClick={() => remove(provider.id)} className="ml-auto text-xs text-red-600 hover:text-red-700">删除</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   )
 }
 

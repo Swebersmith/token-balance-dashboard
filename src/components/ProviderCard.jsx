@@ -13,8 +13,13 @@ function getBalanceLevel(balance, currency) {
 
 export default function ProviderCard({ data }) {
   const { refreshProvider, loading } = useBalance()
-  const provider = getProvider(data.provider)
-  if (!provider) return null
+  const provider = getProvider(data.provider) || {
+    name: data.name || data.provider,
+    nameZh: data.source === 'manual' ? 'Manual balance' : 'Custom API',
+    color: data.color || '#6366f1',
+    currency: data.currency || 'USD',
+    website: data.website || '',
+  }
 
   const statusIcon = {
     ok: <CheckCircle className="w-4 h-4 text-emerald-500" />,
@@ -107,15 +112,17 @@ export default function ProviderCard({ data }) {
           <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
           刷新
         </button>
-        <a
-          href={provider.website}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1 text-xs text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors ml-auto"
-        >
-          <ExternalLink className="w-3 h-3" />
-          官网
-        </a>
+        {provider.website && (
+          <a
+            href={provider.website}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-xs text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors ml-auto"
+          >
+            <ExternalLink className="w-3 h-3" />
+            官网
+          </a>
+        )}
       </div>
     </div>
   )

@@ -32,3 +32,15 @@ export function changeAdminPassword(currentPassword, newPassword) {
     body: JSON.stringify({ currentPassword, newPassword }),
   })
 }
+
+export function getCustomProviders() {
+  return request('/api/admin/custom-providers')
+}
+
+export function saveCustomProvider(provider) {
+  return request('/api/admin/custom-providers', { method: 'POST', body: JSON.stringify(provider) })
+}
+
+export function deleteCustomProvider(id) {
+  return request('/api/admin/custom-providers', { method: 'DELETE', body: JSON.stringify({ id }) })
+}
