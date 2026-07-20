@@ -24,6 +24,18 @@ The `extension` folder is an unpacked Chrome extension for providers without a p
 
 The extension reads only the visible balance and model-price table from supported provider pages that you have already signed in to. It never receives your provider password or browser cookies. A provider balance is refreshed when you open or revisit its account, top-up, or model page; it does not create background logins or automate CAPTCHA/2FA flows.
 
+## Windows Desktop App
+
+`desktop-app` is a standalone Electron application for personal Windows use. It stores API keys with Windows encrypted storage and keeps web-provider sessions inside the application, so browser extensions and Cloudflare sync tokens are not required.
+
+```powershell
+cd desktop-app
+npm install
+npm run dist
+```
+
+Launch the newest `Token Balance.exe` under `desktop-app/release`. Configure direct API providers from the desktop dashboard. For Right Code and RunAPI, select `登录会话` once and sign in in the application window; the persistent session is then refreshed by the desktop app.
+
 The balance API URLs are built in. The server configuration uses these variable names internally:
 
 | Provider | Environment variable | Built-in balance API |

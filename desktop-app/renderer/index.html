@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Token Balance</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand"><span class="mark">TB</span><div><h1>Token Balance</h1><p id="updated">准备连接服务商</p></div></div>
+      <div class="actions"><button id="addManual" class="secondary">添加手动余额</button><button id="refresh" class="primary">刷新全部</button></div>
+    </header>
+    <main>
+      <section id="summary" class="summary"></section>
+      <section><div class="section-heading"><h2>服务商余额</h2><span>API 与本地网页登录会话</span></div><div id="providers" class="provider-grid"></div></section>
+    </main>
+    <dialog id="editor"><form id="editorForm" method="dialog"><div class="dialog-header"><h2 id="editorTitle">配置服务商</h2><button type="button" id="closeEditor" class="icon-button" aria-label="关闭">x</button></div><div id="editorFields" class="form-fields"></div><div class="dialog-actions"><button type="button" id="cancelEditor" class="secondary">取消</button><button class="primary" value="save">保存</button></div></form></dialog>
+    <script src="app.js"></script>
+  </body>
+</html>

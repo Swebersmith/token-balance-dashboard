@@ -14,6 +14,8 @@ dist-ssr
 .dev.vars
 .functions
 .wrangler
+desktop-app/release
+desktop-app/dist
 
 # Editor directories and files
 .vscode/*
