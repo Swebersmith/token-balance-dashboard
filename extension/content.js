@@ -34,8 +34,9 @@ function report() {
   const config = PROVIDERS[location.hostname]
   if (!config) return
   const balance = detectBalance(document.body.innerText)
-  if (!balance) return
-  const payload = { ...config, ...balance, models: detectModels() }
+  const models = detectModels()
+  if (!balance && models.length === 0) return
+  const payload = { ...config, ...(balance || {}), models }
   const signature = JSON.stringify(payload)
   if (signature === lastSignature) return
   lastSignature = signature

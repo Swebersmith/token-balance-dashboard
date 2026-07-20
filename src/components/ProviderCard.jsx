@@ -103,6 +103,20 @@ export default function ProviderCard({ data }) {
         )}
       </div>
 
+      {data.models?.length > 0 && (
+        <div className="mb-3 border-t border-gray-100 pt-2 text-xs dark:border-gray-700">
+          <div className="mb-1 text-gray-500 dark:text-gray-400">模型定价</div>
+          <div className="space-y-1">
+            {data.models.slice(0, 3).map((model) => (
+              <div key={`${model.name}-${model.price}`} className="flex justify-between gap-2 text-gray-600 dark:text-gray-300">
+                <span className="truncate">{model.name}</span>
+                <span className="shrink-0 text-gray-500 dark:text-gray-400">{model.price}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Actions */}
       <div className="flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-gray-700">
         <button
