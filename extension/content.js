@@ -35,7 +35,18 @@ function report() {
   if (!config) return
   const balance = detectBalance(document.body.innerText)
   const models = detectModels()
-  if (!balance && models.length === 0) return
+  if (!balance && models.length === 0) {
+    const signature = `${config.provider}:not-detected:${location.pathname}`
+    if (signature !== lastSignature) {
+      lastSignature = signature
+      chrome.runtime.sendMessage({
+        type: 'detectionStatus',
+        provider: config.provider,
+        message: '当前页面未找到余额或模型价格。请打开账户、充值或模型页面后刷新。',
+      })
+    }
+    return
+  }
   const payload = { ...config, ...(balance || {}), models }
   const signature = JSON.stringify(payload)
   if (signature === lastSignature) return

@@ -7,7 +7,7 @@ async function load() {
   const { [storageKey]: settings, lastSync } = await chrome.storage.local.get([storageKey, 'lastSync'])
   dashboardUrl.value = settings?.dashboardUrl || ''
   token.value = settings?.token || ''
-  if (lastSync?.at) status.textContent = lastSync.error ? `最近同步失败：${lastSync.error}` : `最近同步：${lastSync.provider}`
+  if (lastSync?.at) status.textContent = lastSync.error ? `最近状态：${lastSync.error}` : `最近同步成功：${lastSync.provider}`
 }
 
 document.getElementById('save').addEventListener('click', async () => {

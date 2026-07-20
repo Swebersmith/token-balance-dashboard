@@ -22,4 +22,7 @@ async function sync(payload) {
 
 chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === 'balanceDetected') sync(message.payload)
+  if (message?.type === 'detectionStatus') {
+    chrome.storage.local.set({ lastSync: { provider: message.provider, at: new Date().toISOString(), error: message.message } })
+  }
 })
