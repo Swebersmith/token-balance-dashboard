@@ -15,6 +15,7 @@ const text = {
   normal: '\u6b63\u5e38', cached: '\u7f13\u5b58\u4f59\u989d', unconfigured: '\u672a\u914d\u7f6e', loginRequired: '\u9700\u8981\u767b\u5f55', failed: '\u67e5\u8be2\u5931\u8d25', unknown: '\u672a\u77e5\u72b6\u6001',
   updatedAt: '\u66f4\u65b0\u4e8e', notConfigured: '\u5c1a\u672a\u914d\u7f6e', modelPricing: '\u6a21\u578b\u5b9a\u4ef7',
   configure: '\u914d\u7f6e', loginSession: '\u767b\u5f55\u4f1a\u8bdd', recharge: '\u5145\u503c', pricing: '\u5b9a\u4ef7',
+  delete: '\u5220\u9664', deleteConfirm: '\u5220\u9664\u6b64\u670d\u52a1\u5546\u540e\uff0c\u5176\u672c\u673a\u5bc6\u94a5\u4e0e\u767b\u5f55\u4f1a\u8bdd\u5c06\u4e0d\u518d\u5728\u8f6f\u4ef6\u4e2d\u4f7f\u7528\u3002\u662f\u5426\u7ee7\u7eed\uff1f',
   configureTitle: '\u914d\u7f6e\u670d\u52a1\u5546', addManual: '\u6dfb\u52a0\u624b\u52a8\u4f59\u989d', addWeb: '\u6dfb\u52a0\u7f51\u7ad9\u670d\u52a1\u5546', name: '\u670d\u52a1\u5546\u540d\u79f0', balance: '\u5f53\u524d\u4f59\u989d', currency: '\u5e01\u79cd', website: '\u5b98\u7f51\uff08\u53ef\u9009\uff09',
   balancePage: '\u4f59\u989d\u9875\u7f51\u5740', rechargePage: '\u5145\u503c\u9875\u7f51\u5740\uff08\u53ef\u9009\uff09', pricingPage: '\u5b9a\u4ef7\u9875\u7f51\u5740\uff08\u53ef\u9009\uff09', balanceKeyword: '\u4f59\u989d\u5b57\u6bb5\u6587\u5b57\uff08\u53ef\u9009\uff09',
   keepKey: '\u7559\u7a7a\u4fdd\u7559\u73b0\u6709\u5bc6\u94a5', encrypted: '\u5bc6\u94a5\u7531 Windows \u52a0\u5bc6\u5b58\u50a8\uff0c\u4ec5\u672c\u673a\u5e94\u7528\u53ef\u8bfb\u53d6\u3002', webHint: '\u70b9\u51fb\u201c\u767b\u5f55\u4f1a\u8bdd\u201d\u540e\u5728\u5e94\u7528\u5185\u5b8c\u6210\u767b\u5f55\u3002\u4f1a\u8bdd\u4f1a\u4fdd\u5b58\u5728\u672c\u673a\uff0c\u4f59\u989d\u4f1a\u81ea\u52a8\u5237\u65b0\u3002',
@@ -67,7 +68,7 @@ function showEditor(provider, mode = 'manual') {
 }
 
 function showManager() {
-  managerList.innerHTML = state.providers.map((provider) => `<div class="manager-row"><i class="provider-dot" style="background:${escapeHtml(provider.color || '#6366f1')}"></i><strong>${escapeHtml(provider.name)}</strong><span>${provider.kind === 'api' ? text.apiBalance : provider.kind === 'web' ? text.webSession : text.manualBalance}</span><button class="secondary" data-config-id="${escapeHtml(provider.id)}">${text.configure}</button></div>`).join('')
+  managerList.innerHTML = state.providers.map((provider) => `<div class="manager-row"><i class="provider-dot" style="background:${escapeHtml(provider.color || '#6366f1')}"></i><strong>${escapeHtml(provider.name)}</strong><span>${provider.kind === 'api' ? text.apiBalance : provider.kind === 'web' ? text.webSession : text.manualBalance}</span><button class="secondary" data-config-id="${escapeHtml(provider.id)}">${text.configure}</button><button class="danger" data-delete-id="${escapeHtml(provider.id)}">${text.delete}</button></div>`).join('')
   manager.showModal()
 }
 
@@ -86,7 +87,19 @@ document.getElementById('addManual').addEventListener('click', () => showEditor(
 document.getElementById('addWeb').addEventListener('click', () => showEditor(null, 'web'))
 document.getElementById('manageProviders').addEventListener('click', showManager)
 document.getElementById('closeManager').addEventListener('click', () => manager.close())
-managerList.addEventListener('click', (event) => {
+managerList.addEventListener('click', async (event) => {
+  const deleteId = event.target.dataset.deleteId
+  if (deleteId) {
+    const provider = state.providers.find((item) => item.id === deleteId)
+    if (!provider || !window.confirm(`${text.delete} ${provider.name}\uff1f\n${text.deleteConfirm}`)) return
+    try {
+      render(await window.desktop.deleteProvider(deleteId))
+      showManager()
+    } catch (error) {
+      alert(error.message)
+    }
+    return
+  }
   const provider = state.providers.find((item) => item.id === event.target.dataset.configId)
   if (!provider) return
   manager.close()

@@ -137,19 +137,29 @@ function extractPageData(balanceKeyword = '') {
 }
 
 async function extractRunapiData() {
-  const profileResponse = await fetch('/api/user/self', { credentials: 'include' })
-  const profile = await profileResponse.json()
-  const user = profile?.data?.user || profile?.data || profile
-  const quota = Number(user?.quota)
-  if (!Number.isFinite(quota)) return { balance: null, currency: 'USD', models: [] }
-  let quotaPerUnit = Number(localStorage.getItem('quota_per_unit'))
-  let status = null
+  const parseStorage = (key) => {
+    try { return JSON.parse(localStorage.getItem(key) || 'null') } catch { return null }
+  }
+  const token = localStorage.getItem('token') || ''
+  const headers = token ? { Authorization: `Bearer ${token}` } : {}
+  let profile = null
   try {
-    const statusResponse = await fetch('/api/status', { credentials: 'include' })
+    const profileResponse = await fetch('/api/user/self', { credentials: 'include', headers })
+    profile = await profileResponse.json()
+  } catch {}
+  const savedUser = parseStorage('user')
+  const candidates = [profile?.data?.user, profile?.data, profile, savedUser?.data?.user, savedUser?.data, savedUser]
+  const user = candidates.find((candidate) => Number.isFinite(Number(candidate?.quota)))
+  const quota = Number(user?.quota)
+  if (!Number.isFinite(quota)) throw new Error('RunAPI \u5df2\u767b\u5f55\uff0c\u4f46\u672a\u8bfb\u5230\u8d26\u6237\u989d\u5ea6')
+  let quotaPerUnit = Number(localStorage.getItem('quota_per_unit'))
+  let status = parseStorage('status')
+  try {
+    const statusResponse = await fetch('/api/status', { credentials: 'include', headers })
     status = await statusResponse.json()
     quotaPerUnit = Number(status?.data?.quota_per_unit) || quotaPerUnit
   } catch {}
-  if (!Number.isFinite(quotaPerUnit) || quotaPerUnit <= 0) return { balance: null, currency: 'USD', models: [] }
+  if (!Number.isFinite(quotaPerUnit) || quotaPerUnit <= 0) throw new Error('RunAPI \u672a\u8bfb\u5230\u4f59\u989d\u6362\u7b97\u89c4\u5219')
   const displayType = localStorage.getItem('quota_display_type') || 'USD'
   if (displayType === 'CNY') {
     const exchangeRate = Number(status?.data?.usd_exchange_rate) || 1
@@ -320,6 +330,20 @@ ipcMain.handle('provider:add-web', async (_, input) => {
     balanceKeyword: typeof input?.balanceKeyword === 'string' ? input.balanceKeyword.trim().slice(0, 80) : '',
   })
   await writeConfig(config)
+  return refreshAll()
+})
+ipcMain.handle('provider:delete', async (_, id) => {
+  const config = await readConfig()
+  const provider = config.providers.find((item) => item.id === id)
+  if (!provider) throw new Error('Unknown provider')
+  config.providers = config.providers.filter((item) => item.id !== id)
+  const credentials = await readCredentials()
+  delete credentials[id]
+  const hiddenWindow = hiddenWebWindows.get(id)
+  if (hiddenWindow && !hiddenWindow.isDestroyed()) hiddenWindow.destroy()
+  hiddenWebWindows.delete(id)
+  await writeConfig(config)
+  await writeCredentials(credentials)
   return refreshAll()
 })
 
