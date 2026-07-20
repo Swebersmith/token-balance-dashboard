@@ -3,11 +3,65 @@ import { ArrowLeft, Plus, Trash2, Save, Settings, DollarSign, Link, Database, Ro
 import { useAdmin } from '../context/AdminContext'
 import Layout from '../components/Layout'
 
+const BALANCE_CONFIG = {
+  openai: {
+    envKey: 'OPENAI_API_KEY',
+    endpoint: 'https://api.openai.com/v1/organization/credit_grants',
+  },
+  anthropic: {
+    envKey: 'ANTHROPIC_API_KEY',
+    endpoint: 'https://api.anthropic.com/v1/organizations/{organization_id}/billing/credits',
+    note: 'Requires an Anthropic Admin API key with billing access.',
+  },
+  deepseek: {
+    envKey: 'DEEPSEEK_API_KEY',
+    endpoint: 'https://api.deepseek.com/user/balance',
+  },
+  openrouter: {
+    envKey: 'OPENROUTER_API_KEY',
+    endpoint: 'https://openrouter.ai/api/v1/credits',
+  },
+  together: {
+    envKey: 'TOGETHER_API_KEY',
+    endpoint: 'https://api.together.xyz/v1/billing/credits',
+  },
+  google: {
+    envKey: 'GOOGLE_AI_API_KEY',
+    note: 'Google AI does not provide a key-scoped balance API.',
+  },
+  groq: {
+    envKey: 'GROQ_API_KEY',
+    note: 'Groq does not provide a key-scoped balance API.',
+  },
+}
+
+function BalanceConfiguration({ providerId }) {
+  const config = BALANCE_CONFIG[providerId]
+  if (!config) {
+    return (
+      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-300">
+        自定义服务商仅用于展示。接入余额查询需要在服务端新增对应的 Provider 实现，不能在浏览器中保存 API Key。
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-xs text-indigo-800 dark:border-indigo-900/50 dark:bg-indigo-900/20 dark:text-indigo-300">
+      <p className="font-medium">余额查询由服务端托管</p>
+      <p className="mt-1">环境变量：<code className="font-mono">{config.envKey}</code></p>
+      {config.endpoint && <p className="mt-1 break-all">内置 API 地址：<code className="font-mono">{config.endpoint}</code></p>}
+      <p className="mt-1">请在 Cloudflare Pages 的 Variables and Secrets，或本地 <code className="font-mono">.dev.vars</code> 中设置 API Key。不要在此页面输入密钥。</p>
+      {config.note && <p className="mt-1">{config.note}</p>}
+    </div>
+  )
+}
+
 function ProviderEditor({ provider, onSave, onDelete }) {
   const [edit, setEdit] = useState({ ...provider })
 
   return (
     <div className="bg-gray-50 dark:bg-gray-750 rounded-lg p-4 space-y-3">
+      <BalanceConfiguration providerId={provider.id} />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">ID</label>
@@ -57,15 +111,6 @@ function ProviderEditor({ provider, onSave, onDelete }) {
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1">余额 API 地址</label>
-          <input
-            value={edit.balanceApi || ''}
-            onChange={e => setEdit(p => ({ ...p, balanceApi: e.target.value }))}
-            placeholder="https://api.xxx.com/v1/balance"
-            className="w-full px-3 py-1.5 text-sm border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white font-mono"
-          />
-        </div>
-        <div>
           <label className="block text-xs font-medium text-gray-500 mb-1">官网地址</label>
           <input
             value={edit.website}
@@ -87,15 +132,6 @@ function ProviderEditor({ provider, onSave, onDelete }) {
             value={edit.pricingUrl}
             onChange={e => setEdit(p => ({ ...p, pricingUrl: e.target.value }))}
             className="w-full px-3 py-1.5 text-sm border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-          />
-        </div>
-        <div className="col-span-full">
-          <label className="block text-xs font-medium text-gray-500 mb-1">API Key 环境变量名</label>
-          <input
-            value={edit.envKey || ''}
-            onChange={e => setEdit(p => ({ ...p, envKey: e.target.value }))}
-            placeholder="例如: MYPROVIDER_API_KEY"
-            className="w-full px-3 py-1.5 text-sm border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white font-mono"
           />
         </div>
       </div>
@@ -194,8 +230,6 @@ export function Admin() {
       rechargeUrl: '',
       pricingUrl: '',
       models: [],
-      balanceApi: '',
-      envKey: '',
     })
     setNewId('')
   }
@@ -392,12 +426,6 @@ export function Admin() {
                 className="w-32 px-3 py-1.5 text-sm border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                 onChange={e => localStorage.setItem('token_dashboard_refresh', e.target.value)}
               />
-            </div>
-            <div className="flex items-center gap-2">
-              <input type="checkbox" id="showDemo" defaultChecked className="rounded"
-                onChange={e => localStorage.setItem('token_dashboard_show_demo', e.target.checked)}
-              />
-              <label htmlFor="showDemo" className="text-sm text-gray-900 dark:text-white">无 API 密钥时显示演示数据</label>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-900 dark:text-white mb-1">低余额警告阈值 (USD 等值)</label>

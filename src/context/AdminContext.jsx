@@ -57,7 +57,11 @@ export function AdminProvider({ children }) {
   const restoreBuiltins = useCallback(() => {
     setAdmin(prev => ({
       ...prev,
-      providers: { ...PROVIDERS, ...Object.fromEntries(prev.customProviders.map(p => [p.id, p])) },
+      providers: {
+        ...PROVIDERS,
+        ...Object.fromEntries(prev.customProviders.filter(p => !PROVIDERS[p.id]).map(p => [p.id, p])),
+      },
+      customProviders: prev.customProviders.filter(p => !PROVIDERS[p.id]),
       removedBuiltins: [],
     }))
   }, [])
@@ -68,9 +72,8 @@ export function AdminProvider({ children }) {
       return {
         ...prev,
         providers: { ...prev.providers, [id]: prov },
-        customProviders: PROVIDERS[id]
-          ? prev.customProviders
-          : prev.customProviders.map(p => p.id === id ? prov : p),
+        // Keep built-in overrides too; otherwise they disappear after a page refresh.
+        customProviders: [...prev.customProviders.filter(p => p.id !== id), prov],
       }
     })
   }, [])
