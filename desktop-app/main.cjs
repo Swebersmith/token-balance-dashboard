@@ -22,6 +22,8 @@ let appState = { providers: [] }
 
 function configPath() { return path.join(app.getPath('userData'), 'providers.json') }
 function credentialsPath() { return path.join(app.getPath('userData'), 'credentials.bin') }
+function balanceCachePath() { return path.join(app.getPath('userData'), 'balance-cache.json') }
+function iconPath() { return path.join(__dirname, 'assets', 'balance-center.png') }
 
 function defaults() {
   return [
@@ -60,6 +62,20 @@ async function writeCredentials(credentials) {
   await fs.writeFile(credentialsPath(), safeStorage.encryptString(JSON.stringify(credentials)))
 }
 
+async function readBalanceCache() {
+  try {
+    const data = JSON.parse(await fs.readFile(balanceCachePath(), 'utf8'))
+    return Array.isArray(data.providers) ? { providers: data.providers } : { providers: [] }
+  } catch {
+    return { providers: [] }
+  }
+}
+
+async function writeBalanceCache(state) {
+  await fs.mkdir(app.getPath('userData'), { recursive: true })
+  await fs.writeFile(balanceCachePath(), JSON.stringify(state), 'utf8')
+}
+
 function amount(value) {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : null
@@ -85,7 +101,7 @@ async function fetchJson(url, options, provider) {
   return response.json()
 }
 
-async function fetchDirect(provider, apiKey) {
+async function fetchDirect(provider, apiKey, previous = {}) {
   if (!apiKey) return { ...provider, balance: null, status: 'unconfigured' }
   try {
     if (provider.id === 'openai') {
@@ -113,7 +129,7 @@ async function fetchDirect(provider, apiKey) {
     if (balance == null) throw new Error('No readable credit balance')
     return { ...provider, balance, status: 'ok', updatedAt: new Date().toISOString() }
   } catch (error) {
-    return { ...provider, balance: null, status: 'error', errorMessage: error.message }
+    return { ...provider, ...previous, balance: previous.balance ?? null, status: previous.balance != null ? 'cached' : 'error', errorMessage: error.message }
   }
 }
 
@@ -214,6 +230,7 @@ async function captureVisibleWebBalance(provider, contents) {
       ? { ...provider, ...item, ...data, status: 'ok', updatedAt: new Date().toISOString(), errorMessage: '' }
       : item)
     appState = { providers }
+    await writeBalanceCache(appState).catch(() => {})
     mainWindow?.webContents.send('balances-updated', appState)
     return true
   } catch {
@@ -226,11 +243,12 @@ async function refreshAll() {
   const credentials = await readCredentials()
   const previous = Object.fromEntries(appState.providers.map((provider) => [provider.id, provider]))
   const providers = await Promise.all(config.providers.map(async (provider) => {
-    if (provider.kind === 'api') return fetchDirect(provider, credentials[provider.id])
+    if (provider.kind === 'api') return fetchDirect(provider, credentials[provider.id], previous[provider.id])
     if (provider.kind === 'manual') return { ...provider, balance: amount(provider.manualBalance), status: 'ok', updatedAt: new Date().toISOString() }
     return fetchWeb(provider, previous[provider.id])
   }))
   appState = { providers }
+  await writeBalanceCache(appState).catch(() => {})
   mainWindow?.webContents.send('balances-updated', appState)
   return appState
 }
@@ -245,6 +263,7 @@ async function openProviderPage(id, page) {
     width: 1180,
     height: 820,
     title: `${provider.name} \u767b\u5f55\u4f1a\u8bdd`,
+    icon: iconPath(),
     webPreferences: webPreferencesFor(provider),
   })
   const providerSession = window.webContents.session
@@ -263,6 +282,7 @@ function createMainWindow() {
     minWidth: 900,
     minHeight: 620,
     title: '\u4f59\u989d\u4e2d\u5fc3',
+    icon: iconPath(),
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true },
   })
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'))
@@ -281,7 +301,7 @@ function showMainWindow() {
 }
 
 function createTray() {
-  const icon = nativeImage.createFromPath(path.join(__dirname, 'renderer', 'tray-icon.svg'))
+  const icon = nativeImage.createFromPath(iconPath())
   tray = new Tray(icon)
   tray.setToolTip('\u4f59\u989d\u4e2d\u5fc3\u6b63\u5728\u540e\u53f0\u8fd0\u884c')
   tray.setContextMenu(Menu.buildFromTemplate([
@@ -375,6 +395,7 @@ ipcMain.handle('provider:delete', async (_, id) => {
 })
 
 app.whenReady().then(async () => {
+  appState = await readBalanceCache()
   createMainWindow()
   createTray()
   await refreshAll()
