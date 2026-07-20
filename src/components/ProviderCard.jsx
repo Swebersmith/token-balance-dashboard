@@ -19,6 +19,7 @@ export default function ProviderCard({ data }) {
     color: data.color || '#6366f1',
     currency: data.currency || 'USD',
     website: data.website || '',
+    rechargeUrl: data.rechargeUrl || '',
   }
 
   const statusIcon = {
@@ -121,6 +122,16 @@ export default function ProviderCard({ data }) {
           >
             <ExternalLink className="w-3 h-3" />
             官网
+          </a>
+        )}
+        {provider.rechargeUrl && (
+          <a
+            href={provider.rechargeUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300"
+          >
+            充值
           </a>
         )}
       </div>

@@ -120,3 +120,28 @@ export function clearSessionCookie(request) {
   const secure = new URL(request.url).protocol === 'https:' ? '; Secure' : ''
   return `admin_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${secure}`
 }
+
+async function hashToken(token) {
+  return toBase64Url(new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(token))))
+}
+
+export async function createExtensionToken(env) {
+  if (!env.BALANCE_SETTINGS) throw new Error('Configuration storage is not available')
+  const token = `tbx_${toBase64Url(crypto.getRandomValues(new Uint8Array(32)))}`
+  await env.BALANCE_SETTINGS.put('extension:syncTokenHash', await hashToken(token))
+  return token
+}
+
+export async function revokeExtensionToken(env) {
+  if (env.BALANCE_SETTINGS) await env.BALANCE_SETTINGS.delete('extension:syncTokenHash')
+}
+
+export async function hasExtensionToken(env) {
+  return Boolean(env.BALANCE_SETTINGS && await env.BALANCE_SETTINGS.get('extension:syncTokenHash'))
+}
+
+export async function verifyExtensionToken(request, env) {
+  const token = request.headers.get('Authorization')?.replace(/^Bearer\s+/, '') || ''
+  const stored = env.BALANCE_SETTINGS ? await env.BALANCE_SETTINGS.get('extension:syncTokenHash') : null
+  return Boolean(stored && token && constantTimeEqual(await hashToken(token), stored))
+}

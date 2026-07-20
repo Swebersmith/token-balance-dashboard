@@ -127,6 +127,9 @@ function customProviderResponse(provider, balance, status, extra = {}) {
     name: provider.name,
     color: provider.color || '#6366f1',
     website: provider.website || '',
+    rechargeUrl: provider.rechargeUrl || '',
+    pricingUrl: provider.pricingUrl || '',
+    models: provider.models || [],
     balance,
     currency: provider.currency || 'USD',
     status,
@@ -167,7 +170,7 @@ async function getCustomProviderBalance(provider) {
   if (provider.mode === 'manual') {
     const balance = asAmount(provider.manualBalance)
     if (balance == null) return customProviderResponse(provider, null, 'error', { errorMessage: 'Manual balance is missing' })
-    return customProviderResponse(provider, balance, 'ok', { source: 'manual' })
+    return customProviderResponse(provider, balance, 'ok', { source: provider.source || 'manual' })
   }
 
   if (!provider.apiKey) return customProviderResponse(provider, null, 'unconfigured')
@@ -242,6 +245,42 @@ export async function saveCustomProvider(env, input) {
 export async function deleteCustomProvider(env, id) {
   if (!env.BALANCE_SETTINGS || !id.startsWith('custom-')) throw new Error('Unknown custom provider')
   await env.BALANCE_SETTINGS.delete(`${CUSTOM_PROVIDER_PREFIX}${id}`)
+}
+
+export async function syncExtensionProvider(env, input) {
+  if (!env.BALANCE_SETTINGS) throw new Error('Configuration storage is not available')
+  const rawId = typeof input?.provider === 'string' ? input.provider.toLowerCase().replace(/[^a-z0-9-]/g, '-') : ''
+  const presets = {
+    'right-code': { name: 'Right Code', website: 'https://right.codes/', rechargeUrl: 'https://right.codes/subscribe', pricingUrl: 'https://right.codes/models' },
+    runapi: { name: 'RunAPI', website: 'https://runapi.co/', rechargeUrl: 'https://runapi.co/console/topup', pricingUrl: 'https://runapi.co/pricing' },
+  }
+  const preset = presets[rawId]
+  if (!preset) throw new Error('Unsupported extension provider')
+
+  const id = `custom-${rawId}`
+  const existing = await getCustomProvider(env, id)
+  const balance = input?.balance == null ? existing?.manualBalance : asAmount(input.balance)
+  if (balance == null) throw new Error('No readable balance was detected')
+  const currency = input?.currency === 'CNY' ? 'CNY' : input?.currency === 'USD' ? 'USD' : existing?.currency || 'USD'
+  const models = Array.isArray(input?.models)
+    ? input.models.slice(0, 30).map((model) => ({
+      name: typeof model?.name === 'string' ? model.name.slice(0, 100) : '',
+      price: typeof model?.price === 'string' ? model.price.slice(0, 160) : '',
+    })).filter((model) => model.name && model.price)
+    : existing?.models || []
+  const provider = {
+    ...preset,
+    id,
+    mode: 'manual',
+    source: 'extension',
+    currency,
+    color: rawId === 'right-code' ? '#0f766e' : '#2563eb',
+    manualBalance: balance,
+    models,
+    updatedAt: new Date().toISOString(),
+  }
+  await env.BALANCE_SETTINGS.put(`${CUSTOM_PROVIDER_PREFIX}${id}`, JSON.stringify(provider))
+  return customProviderResponse(provider, balance, 'ok', { source: 'extension' })
 }
 
 export function isKnownProvider(provider) {

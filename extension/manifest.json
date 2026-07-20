@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Token Balance Sync",
+  "version": "1.0.0",
+  "description": "Synchronize visible balances from supported provider pages to Token Balance Dashboard.",
+  "permissions": ["storage", "permissions"],
+  "host_permissions": ["https://right.codes/*", "https://runapi.co/*"],
+  "optional_host_permissions": ["https://*/*"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": { "default_popup": "popup.html" },
+  "content_scripts": [
+    {
+      "matches": ["https://right.codes/*", "https://runapi.co/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

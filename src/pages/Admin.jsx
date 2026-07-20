@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { ArrowLeft, Plus, Trash2, Save, Settings, DollarSign, Link, Database, RotateCcw, AlertTriangle } from 'lucide-react'
 import { useAdmin } from '../context/AdminContext'
 import Layout from '../components/Layout'
-import { changeAdminPassword, deleteCustomProvider, getAdminSettings, getCustomProviders, loginAdmin, logoutAdmin, saveAdminProviderKey, saveCustomProvider } from '../utils/adminApi'
+import { changeAdminPassword, createExtensionToken, deleteCustomProvider, getAdminSettings, getCustomProviders, getExtensionTokenStatus, loginAdmin, logoutAdmin, revokeExtensionToken, saveAdminProviderKey, saveCustomProvider } from '../utils/adminApi'
 
 const BALANCE_CONFIG = {
   openai: {
@@ -228,8 +228,72 @@ function ApiKeySettings() {
           {changingPassword ? '更新中...' : '更新密码'}
         </button>
       </form>
+      <ExtensionSettings />
       <CustomProviderSettings />
     </div>
+  )
+}
+
+function ExtensionSettings() {
+  const [configured, setConfigured] = useState(false)
+  const [token, setToken] = useState('')
+  const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
+
+  useEffect(() => {
+    getExtensionTokenStatus()
+      .then((data) => setConfigured(data.configured))
+      .catch((err) => setError(err.message))
+  }, [])
+
+  const generate = async () => {
+    setError('')
+    setMessage('')
+    try {
+      const data = await createExtensionToken()
+      setToken(data.token)
+      setConfigured(true)
+      setMessage('请立即复制此同步令牌。关闭或刷新后无法再次查看。')
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  const revoke = async () => {
+    setError('')
+    try {
+      await revokeExtensionToken()
+      setConfigured(false)
+      setToken('')
+      setMessage('同步令牌已撤销，扩展将不能再写入余额。')
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  return (
+    <section className="border-t border-gray-200 pt-6 dark:border-gray-700">
+      <h2 className="text-base font-semibold text-gray-900 dark:text-white">浏览器自动同步</h2>
+      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Chrome 扩展在你已登录 Right Code 或 RunAPI 页面时本地识别余额并同步到本站，不上传 Cookie 或账号信息。</p>
+      {error && <p className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-300">{error}</p>}
+      {message && <p className="mt-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">{message}</p>}
+      {token && (
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+          <input readOnly value={token} className="min-w-0 flex-1 rounded-lg border bg-gray-50 px-3 py-2 font-mono text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white" />
+          <button type="button" onClick={() => navigator.clipboard.writeText(token)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">复制令牌</button>
+        </div>
+      )}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" onClick={generate} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">{configured ? '重新生成令牌' : '生成同步令牌'}</button>
+        {configured && <button type="button" onClick={revoke} className="rounded-lg border border-red-200 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-900/20">撤销令牌</button>}
+      </div>
+      <ol className="mt-4 list-decimal space-y-1 pl-5 text-sm text-gray-600 dark:text-gray-300">
+        <li>在 Chrome 打开扩展管理页并启用“开发者模式”。</li>
+        <li>选择“加载已解压的扩展程序”，选中项目中的 <code className="font-mono">extension</code> 文件夹。</li>
+        <li>打开扩展，填写本站地址和刚生成的同步令牌。</li>
+        <li>正常登录服务商官网；打开其账户、充值或模型页面后会自动同步可识别数据。</li>
+      </ol>
+    </section>
   )
 }
 

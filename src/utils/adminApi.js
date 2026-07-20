@@ -44,3 +44,15 @@ export function saveCustomProvider(provider) {
 export function deleteCustomProvider(id) {
   return request('/api/admin/custom-providers', { method: 'DELETE', body: JSON.stringify({ id }) })
 }
+
+export function getExtensionTokenStatus() {
+  return request('/api/admin/extension-token')
+}
+
+export function createExtensionToken() {
+  return request('/api/admin/extension-token', { method: 'POST', body: JSON.stringify({ action: 'create' }) })
+}
+
+export function revokeExtensionToken() {
+  return request('/api/admin/extension-token', { method: 'POST', body: JSON.stringify({ action: 'revoke' }) })
+}
